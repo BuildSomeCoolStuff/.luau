@@ -62,6 +62,61 @@ local function gradient(parent, colorA, colorB, rotation)
 	})
 end
 
+-- Drop shadow. Uses the engine's UIShadow when it exists; otherwise falls
+-- back to a soft 9-slice shadow image placed behind the object and kept in
+-- sync with it (position, size, visibility). Fallback image asset:
+-- rbxassetid://6014261993.
+local function shadow(obj, opts)
+	opts = opts or {}
+	local blur = opts.Blur or 20
+	local yOff = opts.OffsetY or 6
+	local transparency = opts.Transparency or 0.55
+
+	local ok = pcall(function()
+		local sh = Instance.new("UIShadow")
+		sh.BlurRadius = UDim.new(0, blur)
+		sh.Color = Color3.fromRGB(0, 0, 0)
+		sh.Offset = UDim2.fromOffset(0, yOff)
+		sh.Transparency = transparency
+		sh.Parent = obj
+	end)
+	if ok then
+		return
+	end
+
+	local pad = blur + 4
+	local img = Instance.new("ImageLabel")
+	img.Name = "Shadow"
+	img.BackgroundTransparency = 1
+	img.BorderSizePixel = 0
+	img.Image = "rbxassetid://6014261993"
+	img.ImageColor3 = Color3.fromRGB(0, 0, 0)
+	img.ImageTransparency = math.clamp(transparency + 0.1, 0, 1)
+	img.ScaleType = Enum.ScaleType.Slice
+	img.SliceCenter = Rect.new(49, 49, 450, 450)
+	img.AnchorPoint = Vector2.new(0.5, 0.5)
+	img.ZIndex = obj.ZIndex - 1
+	img.Parent = obj.Parent
+
+	local function sync()
+		local abs = obj.AbsoluteSize
+		local pos, anchor = obj.Position, obj.AnchorPoint
+		img.Size = UDim2.fromOffset(abs.X + pad * 2, abs.Y + pad * 2)
+		img.Position = UDim2.new(
+			pos.X.Scale, pos.X.Offset + (0.5 - anchor.X) * abs.X,
+			pos.Y.Scale, pos.Y.Offset + (0.5 - anchor.Y) * abs.Y + yOff
+		)
+		img.Visible = obj.Visible
+	end
+	sync()
+	obj:GetPropertyChangedSignal("AbsoluteSize"):Connect(sync)
+	obj:GetPropertyChangedSignal("Position"):Connect(sync)
+	obj:GetPropertyChangedSignal("Visible"):Connect(sync)
+	obj.Destroying:Connect(function()
+		img:Destroy()
+	end)
+end
+
 local function tween(obj, props, time, style, dir)
 	local info = TweenInfo.new(time or 0.22, style or Enum.EasingStyle.Quart, dir or Enum.EasingDirection.Out)
 	local tw = TweenService:Create(obj, info, props)
@@ -306,13 +361,40 @@ local function buildElementFactory(parent, popupLayer)
 			Parent = btn,
 			BackgroundTransparency = 1,
 			Position = UDim2.new(0, 12, 0, 0),
-			Size = UDim2.new(1, -24, 1, 0),
+			Size = UDim2.new(1, -44, 1, 0),
 			Font = Enum.Font.Gotham,
 			Text = text,
 			TextColor3 = Theme.Text,
 			TextSize = 13,
 			TextXAlignment = Enum.TextXAlignment.Left,
 		})
+
+		-- lucide chevron-right on the right edge; nudges right and brightens on hover
+		local chevron = new("Frame", {
+			Parent = btn,
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, -12, 0.5, 0),
+			Size = UDim2.new(0, 16, 0, 16),
+			BackgroundTransparency = 1,
+		})
+		setIcon(chevron, ChromeIcons.ChevronRight, ">", 14, Theme.SubText)
+		local function chevronObj()
+			return chevron:FindFirstChildWhichIsA("ImageLabel") or chevron:FindFirstChildWhichIsA("TextLabel")
+		end
+		local function chevronColor(color)
+			local o = chevronObj()
+			if o then
+				tween(o, o:IsA("ImageLabel") and { ImageColor3 = color } or { TextColor3 = color }, 0.15)
+			end
+		end
+		btn.MouseEnter:Connect(function()
+			tween(chevron, { Position = UDim2.new(1, -8, 0.5, 0) }, 0.2, Enum.EasingStyle.Quart)
+			chevronColor(Theme.Text)
+		end)
+		btn.MouseLeave:Connect(function()
+			tween(chevron, { Position = UDim2.new(1, -12, 0.5, 0) }, 0.2, Enum.EasingStyle.Quart)
+			chevronColor(Theme.SubText)
+		end)
 
 		addHover(btn)
 		local pressScale = new("UIScale", { Parent = btn, Scale = 1 })
@@ -643,6 +725,7 @@ local function buildElementFactory(parent, popupLayer)
 			AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		})
 		corner(list, 8)
+		shadow(list, { Blur = 14, OffsetY = 4 })
 		local listStroke = stroke(list, Theme.Stroke, 1)
 		gradient(listStroke, Theme.GradientA, Theme.GradientB, 45)
 		new("UIListLayout", {
@@ -1064,6 +1147,7 @@ function Library:CreateWindow(config)
 		ClipsDescendants = true,
 	})
 	corner(Main, 12)
+	shadow(Main, { Blur = 28, OffsetY = 8, Transparency = 0.5 })
 	local mainStroke = stroke(Main, Theme.Stroke, 1)
 	local mainGradient = gradient(mainStroke, Theme.GradientA, Theme.GradientB, 45)
 
@@ -1153,6 +1237,7 @@ function Library:CreateWindow(config)
 		Visible = false,
 	})
 	corner(indicator, 10)
+	shadow(indicator, { Blur = 14, OffsetY = 4 })
 	local indicatorStroke = stroke(indicator, Theme.Stroke, 1)
 	gradient(indicatorStroke, Theme.GradientA, Theme.GradientB, 45)
 
@@ -1362,15 +1447,7 @@ function Library:CreateWindow(config)
 		stroke(card, Theme.Stroke, 1)
 		local cardScale = new("UIScale", { Parent = card, Scale = 0.9 })
 
-		-- soft drop shadow where the engine supports UIShadow; skipped otherwise
-		pcall(function()
-			local shadow = Instance.new("UIShadow")
-			shadow.BlurRadius = UDim.new(0, 18)
-			shadow.Color = Color3.fromRGB(0, 0, 0)
-			shadow.Offset = UDim2.fromOffset(0, 6)
-			shadow.Transparency = 0.55
-			shadow.Parent = card
-		end)
+		shadow(card, { Blur = 24, OffsetY = 6 })
 
 		new("UIListLayout", {
 			Parent = card,
@@ -1594,6 +1671,7 @@ function Library:CreateWindow(config)
 			ZIndex = 1,
 		})
 		corner(card, 10)
+		shadow(card, { Blur = 24, OffsetY = 6 })
 		local cardStroke = stroke(card, Theme.Stroke, 1)
 		gradient(cardStroke, Theme.GradientA, Theme.GradientB, 45)
 		local cardScale = new("UIScale", { Parent = card, Scale = 0.9 })
@@ -1811,6 +1889,7 @@ function Library:CreateWindow(config)
 			BackgroundColor3 = Theme.Panel,
 		})
 		corner(holder, 10)
+		shadow(holder, { Blur = 16, OffsetY = 4 })
 		local nStroke = stroke(holder, Theme.Stroke, 1)
 		gradient(nStroke, Theme.GradientA, Theme.GradientB, 45)
 
