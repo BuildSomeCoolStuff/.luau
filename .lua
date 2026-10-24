@@ -23,6 +23,14 @@ local Theme = {
 --============================================================
 -- HELPERS
 --============================================================
+-- Glass ("Transparent") mode. Set per CreateWindow call; elements built
+-- afterwards read it, so it applies to everything created for that window.
+local Glass = false
+-- tr(x): the transparency to use for a surface in glass mode, 0 (opaque) otherwise.
+local function tr(x)
+	return Glass and x or 0
+end
+
 local function new(class, props, children)
 	local inst = Instance.new(class)
 	if inst:IsA("GuiObject") then
@@ -350,6 +358,7 @@ local function buildElementFactory(parent, popupLayer)
 	function factory:CreateButton(text, callback)
 		local btn = new("TextButton", {
 			Parent = parent,
+			BackgroundTransparency = tr(0.55),
 			Size = UDim2.new(1, 0, 0, 38),
 			BackgroundColor3 = Theme.Element,
 			AutoButtonColor = false,
@@ -419,6 +428,7 @@ local function buildElementFactory(parent, popupLayer)
 
 		local holder = new("Frame", {
 			Parent = parent,
+			BackgroundTransparency = tr(0.55),
 			Size = UDim2.new(1, 0, 0, 38),
 			BackgroundColor3 = Theme.Element,
 		})
@@ -505,6 +515,7 @@ local function buildElementFactory(parent, popupLayer)
 
 		local holder = new("Frame", {
 			Parent = parent,
+			BackgroundTransparency = tr(0.55),
 			Size = UDim2.new(1, 0, 0, 46),
 			BackgroundColor3 = Theme.Element,
 		})
@@ -657,6 +668,7 @@ local function buildElementFactory(parent, popupLayer)
 
 		local holder = new("Frame", {
 			Parent = parent,
+			BackgroundTransparency = tr(0.55),
 			Size = UDim2.new(1, 0, 0, 38),
 			BackgroundColor3 = Theme.Element,
 		})
@@ -715,6 +727,7 @@ local function buildElementFactory(parent, popupLayer)
 		local list = new("ScrollingFrame", {
 			Parent = popupLayer,
 			BackgroundColor3 = Theme.Element,
+			BackgroundTransparency = tr(0.12),
 			Visible = false,
 			ZIndex = 50,
 			BorderSizePixel = 0,
@@ -892,6 +905,12 @@ local function buildElementFactory(parent, popupLayer)
 			end
 		end)
 
+		holder:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
+			if open then
+				closeList()
+			end
+		end)
+
 		-- close when clicking outside both the pill and the popup
 		UserInputService.InputBegan:Connect(function(input)
 			if not open then
@@ -984,9 +1003,404 @@ local function buildElementFactory(parent, popupLayer)
 	end
 
 	----------------------------------------------------------------
+	-- PARAGRAPH
+	----------------------------------------------------------------
+	-- Info card with an optional title and wrapped body text.
+	--   local p = section:CreateParagraph("About", "Long text that wraps...")
+	--   p:Set("New title", "New text")  /  p:SetTitle(...)  /  p:SetText(...)
+	-- A single argument is treated as body text only.
+	function factory:CreateParagraph(title, text)
+		if text == nil then
+			title, text = nil, title
+		end
+
+		local holder = new("Frame", {
+			Parent = parent,
+			Size = UDim2.new(1, 0, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundColor3 = Theme.Element,
+			BackgroundTransparency = tr(0.55),
+		})
+		corner(holder, 8)
+		new("UIListLayout", {
+			Parent = holder,
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, 4),
+		})
+		new("UIPadding", {
+			Parent = holder,
+			PaddingTop = UDim.new(0, 10),
+			PaddingBottom = UDim.new(0, 10),
+			PaddingLeft = UDim.new(0, 12),
+			PaddingRight = UDim.new(0, 12),
+		})
+
+		local titleLabel = new("TextLabel", {
+			Parent = holder,
+			LayoutOrder = 1,
+			BackgroundTransparency = 1,
+			Size = UDim2.new(1, 0, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			Font = Enum.Font.GothamSemibold,
+			Text = title or "",
+			TextColor3 = Theme.Text,
+			TextSize = 13,
+			TextWrapped = true,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = Enum.TextYAlignment.Top,
+			Visible = title ~= nil and title ~= "",
+		})
+		local bodyLabel = new("TextLabel", {
+			Parent = holder,
+			LayoutOrder = 2,
+			BackgroundTransparency = 1,
+			Size = UDim2.new(1, 0, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			Font = Enum.Font.Gotham,
+			Text = text or "",
+			TextColor3 = Theme.SubText,
+			TextSize = 12,
+			TextWrapped = true,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = Enum.TextYAlignment.Top,
+		})
+
+		local paragraph = {}
+		function paragraph:SetTitle(t)
+			titleLabel.Text = t or ""
+			titleLabel.Visible = t ~= nil and t ~= ""
+		end
+		function paragraph:SetText(t)
+			bodyLabel.Text = t or ""
+		end
+		function paragraph:Set(t, body)
+			paragraph:SetTitle(t)
+			paragraph:SetText(body)
+		end
+		return paragraph
+	end
+
+	----------------------------------------------------------------
+	-- COLOR PICKER
+	----------------------------------------------------------------
+	-- Row with a colour swatch; clicking it opens a floating picker with a
+	-- saturation/value square, a hue bar and a hex box.
+	--   local cp = section:CreateColorPicker("Accent", Color3.fromRGB(124, 92, 255), function(color) end)
+	--   cp:Set(Color3.new(1, 0, 0))  /  cp:Get()
+	function factory:CreateColorPicker(text, default, callback)
+		callback = callback or function() end
+		local color = default or Color3.fromRGB(255, 255, 255)
+		local h, s, v = color:ToHSV()
+		local open = false
+		local dragMode -- nil | "sv" | "hue"
+		local PW, PH = 208, 196
+
+		local holder = new("Frame", {
+			Parent = parent,
+			Size = UDim2.new(1, 0, 0, 38),
+			BackgroundColor3 = Theme.Element,
+			BackgroundTransparency = tr(0.55),
+		})
+		corner(holder, 8)
+		addHover(holder)
+
+		new("TextLabel", {
+			Parent = holder,
+			BackgroundTransparency = 1,
+			Position = UDim2.new(0, 12, 0, 0),
+			Size = UDim2.new(1, -80, 1, 0),
+			Font = Enum.Font.Gotham,
+			Text = text,
+			TextColor3 = Theme.Text,
+			TextSize = 13,
+			TextXAlignment = Enum.TextXAlignment.Left,
+		})
+
+		local swatch = new("TextButton", {
+			Parent = holder,
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, -12, 0.5, 0),
+			Size = UDim2.new(0, 44, 0, 22),
+			BackgroundColor3 = color,
+			AutoButtonColor = false,
+			Text = "",
+		})
+		corner(swatch, 6)
+		stroke(swatch, Theme.Stroke, 1)
+
+		-- floating picker panel
+		local panel = new("Frame", {
+			Parent = popupLayer,
+			Size = UDim2.new(0, PW, 0, PH),
+			BackgroundColor3 = Theme.Panel,
+			BackgroundTransparency = tr(0.12),
+			Visible = false,
+			Active = true, -- clicks on the panel shouldn't fall through
+			ZIndex = 50,
+		})
+		corner(panel, 10)
+		stroke(panel, Theme.Stroke, 1)
+		shadow(panel, { Blur = 18, OffsetY = 5 })
+		local panelScale = new("UIScale", { Parent = panel, Scale = 1 })
+
+		-- saturation (x) / value (y) square
+		local sv = new("Frame", {
+			Parent = panel,
+			Position = UDim2.new(0, 12, 0, 12),
+			Size = UDim2.new(0, PW - 24, 0, 110),
+			BackgroundColor3 = Color3.fromHSV(h, 1, 1),
+			ClipsDescendants = true,
+			ZIndex = 51,
+		})
+		corner(sv, 6)
+		local white = new("Frame", {
+			Parent = sv,
+			Size = UDim2.new(1, 0, 1, 0),
+			BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+			ZIndex = 52,
+		})
+		new("UIGradient", {
+			Parent = white,
+			Rotation = 0,
+			Transparency = NumberSequence.new(0, 1), -- opaque white at left -> clear at right
+		})
+		local black = new("Frame", {
+			Parent = sv,
+			Size = UDim2.new(1, 0, 1, 0),
+			BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+			ZIndex = 53,
+		})
+		new("UIGradient", {
+			Parent = black,
+			Rotation = 90,
+			Transparency = NumberSequence.new(1, 0), -- clear at top -> opaque black at bottom
+		})
+		local svCursor = new("Frame", {
+			Parent = sv,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Size = UDim2.new(0, 12, 0, 12),
+			BackgroundTransparency = 1,
+			ZIndex = 55,
+		})
+		corner(svCursor, 6)
+		stroke(svCursor, Color3.fromRGB(255, 255, 255), 2)
+		local svHit = new("TextButton", {
+			Parent = sv,
+			Size = UDim2.new(1, 0, 1, 0),
+			BackgroundTransparency = 1,
+			Text = "",
+			AutoButtonColor = false,
+			ZIndex = 56,
+		})
+
+		-- hue bar
+		local hue = new("Frame", {
+			Parent = panel,
+			Position = UDim2.new(0, 12, 0, 130),
+			Size = UDim2.new(0, PW - 24, 0, 12),
+			BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+			ZIndex = 51,
+		})
+		corner(hue, 6)
+		new("UIGradient", {
+			Parent = hue,
+			Rotation = 0,
+			Color = ColorSequence.new({
+				ColorSequenceKeypoint.new(0, Color3.fromHSV(0, 1, 1)),
+				ColorSequenceKeypoint.new(1 / 6, Color3.fromHSV(1 / 6, 1, 1)),
+				ColorSequenceKeypoint.new(2 / 6, Color3.fromHSV(2 / 6, 1, 1)),
+				ColorSequenceKeypoint.new(3 / 6, Color3.fromHSV(3 / 6, 1, 1)),
+				ColorSequenceKeypoint.new(4 / 6, Color3.fromHSV(4 / 6, 1, 1)),
+				ColorSequenceKeypoint.new(5 / 6, Color3.fromHSV(5 / 6, 1, 1)),
+				ColorSequenceKeypoint.new(1, Color3.fromHSV(0, 1, 1)),
+			}),
+		})
+		local hueCursor = new("Frame", {
+			Parent = hue,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Size = UDim2.new(0, 6, 1, 6),
+			BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+			ZIndex = 53,
+		})
+		corner(hueCursor, 3)
+		stroke(hueCursor, Color3.fromRGB(0, 0, 0), 1, 0.5)
+		local hueHit = new("TextButton", {
+			Parent = hue,
+			Size = UDim2.new(1, 0, 1, 0),
+			BackgroundTransparency = 1,
+			Text = "",
+			AutoButtonColor = false,
+			ZIndex = 54,
+		})
+
+		-- hex input
+		local hexBox = new("TextBox", {
+			Parent = panel,
+			Position = UDim2.new(0, 12, 0, 154),
+			Size = UDim2.new(0, PW - 24, 0, 28),
+			BackgroundColor3 = Theme.ElementHi,
+			ClearTextOnFocus = false,
+			Font = Enum.Font.Gotham,
+			Text = "",
+			PlaceholderText = "#RRGGBB",
+			TextColor3 = Theme.Text,
+			TextSize = 12,
+			ZIndex = 51,
+		})
+		corner(hexBox, 6)
+
+		local function toHex(c)
+			return string.format("#%02X%02X%02X",
+				math.floor(c.R * 255 + 0.5), math.floor(c.G * 255 + 0.5), math.floor(c.B * 255 + 0.5))
+		end
+
+		local function refresh(fire)
+			color = Color3.fromHSV(h, s, v)
+			swatch.BackgroundColor3 = color
+			sv.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
+			svCursor.Position = UDim2.new(s, 0, 1 - v, 0)
+			hueCursor.Position = UDim2.new(h, 0, 0.5, 0)
+			hexBox.Text = toHex(color)
+			if fire then
+				pcall(callback, color)
+			end
+		end
+		refresh(false)
+
+		local function applyDrag(pos)
+			if dragMode == "sv" then
+				s = math.clamp((pos.X - sv.AbsolutePosition.X) / sv.AbsoluteSize.X, 0, 1)
+				v = 1 - math.clamp((pos.Y - sv.AbsolutePosition.Y) / sv.AbsoluteSize.Y, 0, 1)
+			elseif dragMode == "hue" then
+				h = math.clamp((pos.X - hue.AbsolutePosition.X) / hue.AbsoluteSize.X, 0, 1)
+			else
+				return
+			end
+			refresh(true)
+		end
+
+		local function isPointer(input)
+			return input.UserInputType == Enum.UserInputType.MouseButton1
+				or input.UserInputType == Enum.UserInputType.Touch
+		end
+
+		svHit.InputBegan:Connect(function(input)
+			if isPointer(input) then
+				dragMode = "sv"
+				applyDrag(input.Position)
+			end
+		end)
+		hueHit.InputBegan:Connect(function(input)
+			if isPointer(input) then
+				dragMode = "hue"
+				applyDrag(input.Position)
+			end
+		end)
+		UserInputService.InputChanged:Connect(function(input)
+			if dragMode and (input.UserInputType == Enum.UserInputType.MouseMovement
+				or input.UserInputType == Enum.UserInputType.Touch) then
+				applyDrag(input.Position)
+			end
+		end)
+		UserInputService.InputEnded:Connect(function(input)
+			if isPointer(input) then
+				dragMode = nil
+			end
+		end)
+
+		hexBox.FocusLost:Connect(function()
+			local hex = hexBox.Text:gsub("#", "")
+			if #hex == 3 then
+				hex = hex:gsub(".", "%0%0") -- "f80" -> "ff8800"
+			end
+			if hex:match("^%x%x%x%x%x%x$") then
+				local r = tonumber(hex:sub(1, 2), 16)
+				local g = tonumber(hex:sub(3, 4), 16)
+				local b = tonumber(hex:sub(5, 6), 16)
+				h, s, v = Color3.fromRGB(r, g, b):ToHSV()
+				refresh(true)
+			else
+				hexBox.Text = toHex(color) -- invalid input: put the real value back
+			end
+		end)
+
+		-- right-aligned under the swatch; flips above it if there's no room
+		local function layoutPanel()
+			local layerPos = popupLayer.AbsolutePosition
+			local layerSize = popupLayer.AbsoluteSize
+			local sp = swatch.AbsolutePosition - layerPos
+			local sh = swatch.AbsoluteSize.Y
+			local x = math.clamp(sp.X + swatch.AbsoluteSize.X - PW, 8, math.max(8, layerSize.X - PW - 8))
+			local y = sp.Y + sh + 4
+			if y + PH > layerSize.Y - 8 then
+				y = math.max(8, sp.Y - PH - 4)
+			end
+			panel.Position = UDim2.fromOffset(x, y)
+		end
+
+		local function closePanel()
+			open = false
+			dragMode = nil
+			local t = tween(panelScale, { Scale = 0.92 }, 0.12)
+			t.Completed:Once(function()
+				if not open then
+					panel.Visible = false
+				end
+			end)
+		end
+
+		local function openPanel()
+			open = true
+			layoutPanel()
+			panelScale.Scale = 0.92
+			panel.Visible = true
+			tween(panelScale, { Scale = 1 }, 0.25, Enum.EasingStyle.Back)
+		end
+
+		swatch.MouseButton1Click:Connect(function()
+			if open then
+				closePanel()
+			else
+				openPanel()
+			end
+		end)
+
+		-- close when clicking outside, or when the page scrolls the row away
+		UserInputService.InputBegan:Connect(function(input)
+			if not open or not isPointer(input) then
+				return
+			end
+			local pos = input.Position
+			local function within(frame)
+				local tl, sz = frame.AbsolutePosition, frame.AbsoluteSize
+				return pos.X >= tl.X and pos.X <= tl.X + sz.X and pos.Y >= tl.Y and pos.Y <= tl.Y + sz.Y
+			end
+			if not within(swatch) and not within(panel) then
+				closePanel()
+			end
+		end)
+		holder:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
+			if open then
+				closePanel()
+			end
+		end)
+
+		local picker = {}
+		function picker:Set(c)
+			h, s, v = c:ToHSV()
+			refresh(true)
+		end
+		function picker:Get()
+			return color
+		end
+		return picker
+	end
+
+	----------------------------------------------------------------
 	function factory:CreateTextbox(text, placeholder, callback)
 		local holder = new("Frame", {
 			Parent = parent,
+			BackgroundTransparency = tr(0.55),
 			Size = UDim2.new(1, 0, 0, 38),
 			BackgroundColor3 = Theme.Element,
 		})
@@ -1044,6 +1458,7 @@ local function buildElementFactory(parent, popupLayer)
 
 		local holder = new("Frame", {
 			Parent = parent,
+			BackgroundTransparency = tr(0.55),
 			Size = UDim2.new(1, 0, 0, 38),
 			BackgroundColor3 = Theme.Element,
 		})
@@ -1120,6 +1535,12 @@ function Library:CreateWindow(config)
 	local toggleKey   = config.ToggleKey or Enum.KeyCode.RightControl
 	local toggleImage = config.ToggleImage or ""
 
+	-- Transparent = true -> fake frosted / liquid-glass look: translucent
+	-- surfaces, a diagonal sheen, a bright rim and a top specular line.
+	-- (Roblox UI can't blur what's behind it, so this is layered
+	-- translucency, not a real blur.)
+	Glass = config.Transparent == true
+
 	-- icon-only sidebar: tabs show just their icon (falling back to a
 	-- centered label if a tab has no icon), and the sidebar itself
 	-- narrows to match. Can also be changed later via Window:SetSidebarCompacted.
@@ -1144,6 +1565,7 @@ function Library:CreateWindow(config)
 		Position = UDim2.new(0.5, 0, 0.5, 0),
 		Size = UDim2.new(0, 0, 0, 0),
 		BackgroundColor3 = Theme.Background,
+		BackgroundTransparency = tr(0.3),
 		ClipsDescendants = true,
 	})
 	corner(Main, 12)
@@ -1151,12 +1573,75 @@ function Library:CreateWindow(config)
 	local mainStroke = stroke(Main, Theme.Stroke, 1)
 	local mainGradient = gradient(mainStroke, Theme.GradientA, Theme.GradientB, 45)
 
+	local sideDivider
+	if Glass then
+		-- bright glass rim instead of the accent border
+		mainStroke.Thickness = 1.5
+		mainStroke.Transparency = 0.35
+		mainGradient.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(150, 175, 255))
+
+		-- diagonal sheen across the whole pane (created first so it sits behind content)
+		local sheen = new("Frame", {
+			Name = "Sheen",
+			Parent = Main,
+			Size = UDim2.new(1, 0, 1, 0),
+			BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		})
+		corner(sheen, 12)
+		new("UIGradient", {
+			Parent = sheen,
+			Rotation = 45,
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0.84),
+				NumberSequenceKeypoint.new(0.35, 0.96),
+				NumberSequenceKeypoint.new(0.7, 0.975),
+				NumberSequenceKeypoint.new(1, 0.9),
+			}),
+		})
+
+		-- specular highlight along the top edge
+		local spec = new("Frame", {
+			Name = "Specular",
+			Parent = Main,
+			Position = UDim2.new(0, 14, 0, 1),
+			Size = UDim2.new(1, -28, 0, 1),
+			BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		})
+		new("UIGradient", {
+			Parent = spec,
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 1),
+				NumberSequenceKeypoint.new(0.5, 0.45),
+				NumberSequenceKeypoint.new(1, 1),
+			}),
+		})
+
+		-- hairline dividers where the opaque panels used to separate regions
+		new("Frame", {
+			Name = "HeaderDivider",
+			Parent = Main,
+			Position = UDim2.new(0, 0, 0, 40),
+			Size = UDim2.new(1, 0, 0, 1),
+			BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+			BackgroundTransparency = 0.9,
+		})
+		sideDivider = new("Frame", {
+			Name = "SidebarDivider",
+			Parent = Main,
+			Position = UDim2.new(0, sidebarWidth(), 0, 41),
+			Size = UDim2.new(0, 1, 1, -41),
+			BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+			BackgroundTransparency = 0.9,
+		})
+	end
+
 	tween(Main, { Size = size }, 0.5)
 
 	local TopBar = new("Frame", {
 		Name = "TopBar",
 		Parent = Main,
 		BackgroundColor3 = Theme.Panel,
+		BackgroundTransparency = Glass and 1 or 0,
 		Size = UDim2.new(1, 0, 0, 40),
 	})
 	corner(TopBar, 12)
@@ -1164,6 +1649,7 @@ function Library:CreateWindow(config)
 	new("Frame", {
 		Parent = TopBar,
 		BackgroundColor3 = Theme.Panel,
+		BackgroundTransparency = Glass and 1 or 0,
 		BorderSizePixel = 0,
 		Position = UDim2.new(0, 0, 1, -12),
 		Size = UDim2.new(1, 0, 0, 12),
@@ -1235,6 +1721,7 @@ function Library:CreateWindow(config)
 		AutoButtonColor = false,
 		Text = "",
 		Visible = false,
+		BackgroundTransparency = tr(0.2),
 	})
 	corner(indicator, 10)
 	shadow(indicator, { Blur = 14, OffsetY = 4 })
@@ -1310,6 +1797,7 @@ function Library:CreateWindow(config)
 		Position = UDim2.new(0, 0, 0, 40),
 		Size = UDim2.new(0, sidebarWidth(), 1, -40),
 		BackgroundColor3 = Theme.Panel,
+		BackgroundTransparency = Glass and 1 or 0,
 	})
 	-- Main's UICorner only masks Main's own background -- it doesn't clip
 	-- children, so TabBar's square corners were poking through Main's
@@ -1321,11 +1809,13 @@ function Library:CreateWindow(config)
 	new("Frame", { -- squares off the top-left/top-right (seam against TopBar)
 		Parent = TabBar,
 		BackgroundColor3 = Theme.Panel,
+		BackgroundTransparency = Glass and 1 or 0,
 		Size = UDim2.new(1, 0, 0, 12),
 	})
 	new("Frame", { -- squares off the bottom-right (seam against PagesHolder)
 		Parent = TabBar,
 		BackgroundColor3 = Theme.Panel,
+		BackgroundTransparency = Glass and 1 or 0,
 		AnchorPoint = Vector2.new(1, 1),
 		Position = UDim2.new(1, 0, 1, 0),
 		Size = UDim2.new(0, 12, 0, 12),
@@ -1441,6 +1931,7 @@ function Library:CreateWindow(config)
 			Size = UDim2.new(0, width, 0, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundColor3 = Theme.Panel,
+			BackgroundTransparency = tr(0.15),
 			Active = true, -- swallow clicks so the backdrop doesn't see them
 		})
 		corner(card, 14)
@@ -1667,6 +2158,7 @@ function Library:CreateWindow(config)
 			Position = UDim2.new(0.5, 0, 0.5, 0),
 			Size = popupSize,
 			BackgroundColor3 = Theme.Panel,
+			BackgroundTransparency = tr(0.15),
 			Active = true, -- swallow clicks so they don't hit the dim backdrop
 			ZIndex = 1,
 		})
@@ -1842,6 +2334,9 @@ function Library:CreateWindow(config)
 		sidebarCompacted = state and true or false
 		local width = sidebarWidth()
 		tween(TabBar, { Size = UDim2.new(0, width, 1, -40) }, 0.2)
+		if sideDivider then
+			tween(sideDivider, { Position = UDim2.new(0, width, 0, 41) }, 0.2)
+		end
 		tween(pagesHolder, {
 			Position = UDim2.new(0, width, 0, 40),
 			Size = UDim2.new(1, -width, 1, -40),
@@ -1887,6 +2382,7 @@ function Library:CreateWindow(config)
 			Position = UDim2.new(0, 290, 0, 0),
 			Size = UDim2.new(1, 0, 1, 0),
 			BackgroundColor3 = Theme.Panel,
+			BackgroundTransparency = tr(0.15),
 		})
 		corner(holder, 10)
 		shadow(holder, { Blur = 16, OffsetY = 4 })
@@ -2021,7 +2517,7 @@ function Library:CreateWindow(config)
 			page.Position = UDim2.new(0, 0, 0, 12)
 			page.Visible = true
 			tween(page, { Position = UDim2.new(0, 0, 0, 0) }, 0.3, Enum.EasingStyle.Quart)
-			tween(tabButton, { BackgroundTransparency = 0 }, 0.15)
+			tween(tabButton, { BackgroundTransparency = tr(0.55) }, 0.15)
 			tween(tabLabel, { TextColor3 = Theme.Text }, 0.15)
 			if tabIcon then
 				tween(tabIcon, { ImageColor3 = Theme.Text }, 0.15)
