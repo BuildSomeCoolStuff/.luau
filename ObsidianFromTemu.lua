@@ -9,6 +9,7 @@ Section.__index = Section
 
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 
 local Theme = {
 	Main = Color3.fromRGB(24, 24, 28),
@@ -17,6 +18,8 @@ local Theme = {
 	Element = Color3.fromRGB(40, 40, 46),
 	Hover = Color3.fromRGB(50, 50, 58),
 	Danger = Color3.fromRGB(200, 60, 60),
+	Success = Color3.fromRGB(60, 170, 100),
+	Warning = Color3.fromRGB(225, 160, 50),
 	Off = Color3.fromRGB(65, 65, 74),
 	IconOff = Color3.fromRGB(160, 160, 170),
 	IconOn = Color3.fromRGB(255, 255, 255),
@@ -131,7 +134,7 @@ local function extract(icon)
 end
 
 -- Returns true if an icon was applied.
-local function applyIcon(imageObj, icon, provider)
+local function applyIcon(imageObj, icon, provider, quiet)
 	local out = extract(icon)
 
 	-- icon name -> ask the icon provider. Supports both IconsV2.GetIcon(name) and IconsV2:GetIcon(name)
@@ -155,7 +158,7 @@ local function applyIcon(imageObj, icon, provider)
 	end
 
 	if not out.image then
-		warn("[RobloxUI] icon not recognized:", typeof(icon), icon)
+		if not quiet then warn("[RobloxUI] icon not recognized:", typeof(icon), icon) end
 		return false
 	end
 
@@ -570,6 +573,270 @@ function Library:_keyTaken(key, except)
 		if kb ~= except and kb._key == key then return true end
 	end
 	return false
+end
+
+--// ================= NOTIFICATIONS =================
+-- Window:Notify({ Title = "Saved", Content = "Config loaded", Duration = 4, Type = "success", Icon = "bell" })
+-- Type: "info" (default) | "success" | "warning" | "error". Duration = 0 keeps it until clicked.
+-- Cards slide down from the top (like the watermark), stack under it, and click to dismiss.
+local NOTIFY_WIDTH, NOTIFY_MAX = 280, 5
+local NOTIFY_TYPES = {
+	info = { color = Theme.Accent, glyph = "i", icons = { "info", "bell" } },
+	success = { color = Theme.Success, glyph = "✓", icons = { "circle-check", "check-circle", "check" } },
+	warning = { color = Theme.Warning, glyph = "!", icons = { "triangle-alert", "alert-triangle", "bell" } },
+	error = { color = Theme.Danger, glyph = "✕", icons = { "circle-x", "x-circle", "x" } },
+}
+
+-- tries several icon names (lucide renamed a few), silently
+local function applyIconAny(imageObj, names, provider)
+	for _, name in ipairs(names) do
+		if applyIcon(imageObj, name, provider, true) then return true end
+	end
+	return false
+end
+
+function Library:_getNotifyContainer()
+	if self._notifyContainer and self._notifyContainer.Parent then
+		return self._notifyContainer
+	end
+
+	local vp = self.ScreenGui.AbsoluteSize
+	local width = vp.X > 0 and math.min(NOTIFY_WIDTH, vp.X - 20) or NOTIFY_WIDTH
+
+	local C = Instance.new("Frame")
+	C.Name = "Notifications"
+	C.AnchorPoint = Vector2.new(0.5, 0)
+	C.Position = UDim2.new(0.5, 0, 0, self._wm and 48 or 10) -- right under the watermark
+	C.Size = UDim2.new(0, width, 0, 0)
+	C.AutomaticSize = Enum.AutomaticSize.Y
+	C.BackgroundTransparency = 1
+	C.BorderSizePixel = 0
+	C.Parent = self.ScreenGui
+
+	local Layout = Instance.new("UIListLayout")
+	Layout.Padding = UDim.new(0, 6)
+	Layout.SortOrder = Enum.SortOrder.LayoutOrder
+	Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	Layout.Parent = C
+
+	self._notifyContainer = C
+	return C
+end
+
+function Library:Notify(config)
+	if self._destroyed then return end
+	if type(config) == "string" then config = { Content = config } end
+	config = config or {}
+
+	local spec = NOTIFY_TYPES[config.Type or "info"] or NOTIFY_TYPES.info
+	local color = spec.color
+	local duration = tonumber(config.Duration) or 4
+	local container = self:_getNotifyContainer()
+
+	self._notifyCount = (self._notifyCount or 0) + 1
+	self._notifs = self._notifs or {}
+	local dismissed = false
+
+	-- Wrapper reserves the layout space (its height is animated); Card is what slides.
+	local Wrapper = Instance.new("Frame")
+	Wrapper.Name = "Notification"
+	Wrapper.Size = UDim2.new(1, 0, 0, 0)
+	Wrapper.BackgroundTransparency = 1
+	Wrapper.BorderSizePixel = 0
+	Wrapper.LayoutOrder = self._notifyCount
+	Wrapper.Parent = container
+
+	local Card = Instance.new("CanvasGroup")
+	Card.Name = "Card"
+	Card.Size = UDim2.new(1, 0, 0, 0)
+	Card.AutomaticSize = Enum.AutomaticSize.Y
+	Card.BackgroundColor3 = Theme.Sidebar
+	Card.BorderSizePixel = 0
+	Card.GroupTransparency = 1 -- invisible until measured and positioned above the screen
+	Card.Parent = Wrapper
+	corner(Card, 8)
+
+	local Stroke = Instance.new("UIStroke")
+	Stroke.Color = Theme.Element
+	Stroke.Thickness = 1
+	Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	Stroke.Parent = Card
+
+	local Body = Instance.new("Frame")
+	Body.Name = "Body"
+	Body.Size = UDim2.new(1, 0, 0, 0)
+	Body.AutomaticSize = Enum.AutomaticSize.Y
+	Body.BackgroundTransparency = 1
+	Body.BorderSizePixel = 0
+	Body.Parent = Card
+
+	local BodyPad = Instance.new("UIPadding")
+	BodyPad.PaddingTop = UDim.new(0, 10)
+	BodyPad.PaddingBottom = UDim.new(0, 10)
+	BodyPad.PaddingLeft = UDim.new(0, 10)
+	BodyPad.PaddingRight = UDim.new(0, 10)
+	BodyPad.Parent = Body
+
+	local BodyMin = Instance.new("UISizeConstraint")
+	BodyMin.MinSize = Vector2.new(0, 46)
+	BodyMin.Parent = Body
+
+	local Chip = Instance.new("Frame")
+	Chip.Name = "IconChip"
+	Chip.Size = UDim2.new(0, 26, 0, 26)
+	Chip.BackgroundColor3 = color
+	Chip.BackgroundTransparency = 0.8
+	Chip.BorderSizePixel = 0
+	Chip.Parent = Body
+	corner(Chip, 6)
+
+	local Icon = Instance.new("ImageLabel")
+	Icon.Name = "Icon"
+	Icon.AnchorPoint = Vector2.new(0.5, 0.5)
+	Icon.Position = UDim2.new(0.5, 0, 0.5, 0)
+	Icon.Size = UDim2.new(0, 16, 0, 16)
+	Icon.BackgroundTransparency = 1
+	Icon.BorderSizePixel = 0
+	Icon.ImageColor3 = color
+	Icon.ScaleType = Enum.ScaleType.Fit
+	Icon.Parent = Chip
+
+	-- text fallback if the icon library isn't available
+	local Glyph = Instance.new("TextLabel")
+	Glyph.Name = "IconFallback"
+	Glyph.Size = UDim2.new(1, 0, 1, 0)
+	Glyph.BackgroundTransparency = 1
+	Glyph.Text = spec.glyph
+	Glyph.TextColor3 = color
+	Glyph.Font = Enum.Font.GothamBold
+	Glyph.TextSize = 14
+	Glyph.Parent = Icon
+
+	local iconNames = spec.icons
+	if config.Icon then
+		iconNames = { config.Icon, table.unpack(spec.icons) }
+	end
+	Glyph.Visible = not applyIconAny(Icon, iconNames, self.Icons)
+
+	local Texts = Instance.new("Frame")
+	Texts.Name = "Texts"
+	Texts.Position = UDim2.new(0, 36, 0, 0)
+	Texts.Size = UDim2.new(1, -36, 0, 0)
+	Texts.AutomaticSize = Enum.AutomaticSize.Y
+	Texts.BackgroundTransparency = 1
+	Texts.BorderSizePixel = 0
+	Texts.Parent = Body
+
+	local TextsLayout = Instance.new("UIListLayout")
+	TextsLayout.Padding = UDim.new(0, 2)
+	TextsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	TextsLayout.Parent = Texts
+
+	local function textLabel(text, font, size, tint, order)
+		local L = Instance.new("TextLabel")
+		L.Size = UDim2.new(1, 0, 0, 0)
+		L.AutomaticSize = Enum.AutomaticSize.Y
+		L.BackgroundTransparency = 1
+		L.BorderSizePixel = 0
+		L.Text = text
+		L.TextColor3 = tint
+		L.Font = font
+		L.TextSize = size
+		L.TextWrapped = true
+		L.TextXAlignment = Enum.TextXAlignment.Left
+		L.TextYAlignment = Enum.TextYAlignment.Top
+		L.LayoutOrder = order
+		L.Parent = Texts
+		return L
+	end
+
+	if config.Title and config.Title ~= "" then
+		textLabel(tostring(config.Title), Enum.Font.GothamBold, 13, Theme.Text, 1).Name = "Title"
+	end
+	if config.Content and config.Content ~= "" then
+		textLabel(tostring(config.Content), Enum.Font.Gotham, 12, Theme.SubText, 2).Name = "Content"
+	end
+
+	-- countdown bar along the bottom edge
+	local Bar = Instance.new("Frame")
+	Bar.Name = "Timer"
+	Bar.AnchorPoint = Vector2.new(0, 1)
+	Bar.Position = UDim2.new(0, 0, 1, 0)
+	Bar.Size = UDim2.new(1, 0, 0, 2)
+	Bar.BackgroundColor3 = color
+	Bar.BorderSizePixel = 0
+	Bar.Visible = duration > 0
+	Bar.Parent = Card
+
+	-- click anywhere on the card to dismiss
+	local Click = Instance.new("TextButton")
+	Click.Name = "Click"
+	Click.Size = UDim2.new(1, 0, 1, 0)
+	Click.BackgroundTransparency = 1
+	Click.BorderSizePixel = 0
+	Click.Text = ""
+	Click.AutoButtonColor = false
+	Click.Parent = Card
+
+	local function dismiss()
+		if dismissed then return end
+		dismissed = true
+		local i = table.find(self._notifs, dismiss)
+		if i then table.remove(self._notifs, i) end
+		if self._destroyed then return end
+
+		local away = tween(Card, {
+			Position = UDim2.new(0, 0, 0, -20),
+			GroupTransparency = 1,
+		}, 0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		away.Completed:Connect(function()
+			local collapse = tween(Wrapper, { Size = UDim2.new(1, 0, 0, 0) }, 0.2, Enum.EasingStyle.Quint)
+			collapse.Completed:Connect(function()
+				Wrapper:Destroy()
+			end)
+		end)
+	end
+	Click.MouseButton1Click:Connect(dismiss)
+
+	table.insert(self._notifs, dismiss)
+	while #self._notifs > NOTIFY_MAX do
+		self._notifs[1]() -- drop the oldest (removes itself from the list)
+	end
+
+	-- measure once layout has settled, then slide in from above the screen
+	task.spawn(function()
+		RunService.Heartbeat:Wait()
+		RunService.Heartbeat:Wait()
+		local h = Card.AbsoluteSize.Y
+		for _ = 1, 10 do
+			if h > 0 then break end
+			RunService.Heartbeat:Wait()
+			h = Card.AbsoluteSize.Y
+		end
+		if h <= 0 then h = 50 end
+		if dismissed or self._destroyed or not Wrapper.Parent then return end
+
+		Card.Position = UDim2.new(0, 0, 0, -(Wrapper.AbsolutePosition.Y + h + 10))
+		tween(Wrapper, { Size = UDim2.new(1, 0, 0, h) }, 0.3, Enum.EasingStyle.Quint)
+		tween(Card, { Position = UDim2.new(0, 0, 0, 0) }, 0.45, Enum.EasingStyle.Back)
+		tween(Card, { GroupTransparency = 0 }, 0.25)
+
+		-- keep the reserved height right if the text reflows later
+		Card:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+			if not dismissed and Card.AbsoluteSize.Y > 0 then
+				Wrapper.Size = UDim2.new(1, 0, 0, Card.AbsoluteSize.Y)
+			end
+		end)
+
+		if duration > 0 then
+			local countdown = tween(Bar, { Size = UDim2.new(0, 0, 0, 2) }, duration, Enum.EasingStyle.Linear)
+			countdown.Completed:Connect(function(state)
+				if state == Enum.PlaybackState.Completed then dismiss() end
+			end)
+		end
+	end)
+
+	return { Dismiss = dismiss }
 end
 
 --// ================= FLOATING WATERMARK =================
@@ -1214,6 +1481,105 @@ function Section:AddToggle(config)
 	end
 
 	return toggle
+end
+
+-- Paragraph: static wrapped text block with an optional bold title. Grows to fit its text.
+-- Options: Title, Content, RichText (default false)
+function Section:AddParagraph(config)
+	config = config or {}
+	self._count += 1
+
+	local title = config.Title and tostring(config.Title) or ""
+	local content = config.Content and tostring(config.Content) or ""
+
+	local Holder = Instance.new("Frame")
+	Holder.Name = "Paragraph"
+	Holder.Size = UDim2.new(1, 0, 0, 0)
+	Holder.AutomaticSize = Enum.AutomaticSize.Y
+	Holder.BackgroundColor3 = Theme.Element
+	Holder.BorderSizePixel = 0
+	Holder.LayoutOrder = self._count
+	Holder.Parent = self.Holder
+	corner(Holder, 6)
+
+	local Pad = Instance.new("UIPadding")
+	Pad.PaddingTop = UDim.new(0, 8)
+	Pad.PaddingBottom = UDim.new(0, 8)
+	Pad.PaddingLeft = UDim.new(0, 8)
+	Pad.PaddingRight = UDim.new(0, 8)
+	Pad.Parent = Holder
+
+	local Layout = Instance.new("UIListLayout")
+	Layout.Padding = UDim.new(0, 3)
+	Layout.SortOrder = Enum.SortOrder.LayoutOrder
+	Layout.Parent = Holder
+
+	local function makeLabel(name, font, size, tint, order)
+		local L = Instance.new("TextLabel")
+		L.Name = name
+		L.Size = UDim2.new(1, 0, 0, 0)
+		L.AutomaticSize = Enum.AutomaticSize.Y
+		L.BackgroundTransparency = 1
+		L.BorderSizePixel = 0
+		L.TextColor3 = tint
+		L.Font = font
+		L.TextSize = size
+		L.TextWrapped = true
+		L.RichText = config.RichText == true
+		L.TextXAlignment = Enum.TextXAlignment.Left
+		L.TextYAlignment = Enum.TextYAlignment.Top
+		L.LayoutOrder = order
+		L.Parent = Holder
+		return L
+	end
+
+	local TitleLabel = makeLabel("Title", Enum.Font.GothamBold, 14, Theme.Text, 1)
+	local ContentLabel = makeLabel("Content", Enum.Font.Gotham, 13, Theme.SubText, 2)
+
+	-- hidden labels are skipped by the layout, so an empty title/content leaves no gap
+	local function refresh(animate)
+		TitleLabel.Text = title
+		TitleLabel.Visible = title ~= ""
+		ContentLabel.Text = content
+		ContentLabel.Visible = content ~= ""
+		if animate then
+			TitleLabel.TextTransparency = 1
+			ContentLabel.TextTransparency = 1
+			tween(TitleLabel, { TextTransparency = 0 }, 0.2)
+			tween(ContentLabel, { TextTransparency = 0 }, 0.2)
+		end
+	end
+	refresh(false)
+
+	local paragraph = { Instance = Holder }
+
+	function paragraph:SetTitle(text)
+		title = text and tostring(text) or ""
+		refresh(true)
+	end
+
+	function paragraph:SetContent(text)
+		content = text and tostring(text) or ""
+		refresh(true)
+	end
+
+	-- paragraph:Set({ Title = "...", Content = "..." }) updates both at once
+	function paragraph:Set(data)
+		data = data or {}
+		if data.Title ~= nil then title = tostring(data.Title) end
+		if data.Content ~= nil then content = tostring(data.Content) end
+		refresh(true)
+	end
+
+	function paragraph:Get()
+		return title, content
+	end
+
+	function paragraph:Destroy()
+		Holder:Destroy()
+	end
+
+	return paragraph
 end
 
 -- Textbox. Callback fires when the box loses focus (Enter or click away):
