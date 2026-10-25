@@ -15,6 +15,7 @@ local Theme = {
 	Sidebar = Color3.fromRGB(18, 18, 22),
 	Card = Color3.fromRGB(30, 30, 35),
 	Element = Color3.fromRGB(40, 40, 46),
+	Hover = Color3.fromRGB(50, 50, 58),
 	Off = Color3.fromRGB(65, 65, 74),
 	IconOff = Color3.fromRGB(160, 160, 170),
 	IconOn = Color3.fromRGB(255, 255, 255),
@@ -25,6 +26,46 @@ local Theme = {
 
 local SIDEBAR_WIDTH = 50
 local CORNER_RADIUS = 8
+
+--// ================= ANIMATION HELPERS =================
+local function tween(obj, props, time, style, dir)
+	local t = TweenService:Create(
+		obj,
+		TweenInfo.new(time or 0.15, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out),
+		props
+	)
+	t:Play()
+	return t
+end
+
+local function isPress(input)
+	return input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch
+end
+
+-- Hover colour + press-scale feedback for a button.
+-- `locked` (optional) returns true while the button manages its own colour (e.g. active tab).
+local function addFeedback(btn, normal, hover, locked)
+	local scale = Instance.new("UIScale")
+	scale.Parent = btn
+
+	btn.MouseEnter:Connect(function()
+		if not (locked and locked()) then
+			tween(btn, { BackgroundColor3 = hover }, 0.12)
+		end
+	end)
+	btn.MouseLeave:Connect(function()
+		tween(scale, { Scale = 1 }, 0.12)
+		if not (locked and locked()) then
+			tween(btn, { BackgroundColor3 = normal }, 0.15)
+		end
+	end)
+	btn.InputBegan:Connect(function(input)
+		if isPress(input) then tween(scale, { Scale = 0.96 }, 0.08) end
+	end)
+	btn.InputEnded:Connect(function(input)
+		if isPress(input) then tween(scale, { Scale = 1 }, 0.18, Enum.EasingStyle.Back) end
+	end)
+end
 
 --// ================= ICON HANDLING =================
 -- Scans whatever the icon library returns (string / number / array / dict / nested / Instance)
@@ -176,7 +217,8 @@ function Library.new(config)
 
 	local desiredSize = config.Size or UDim2.new(0, 600, 0, 400)
 
-	local Main = Instance.new("Frame")
+	-- CanvasGroup lets the whole window fade in/out as one piece
+	local Main = Instance.new("CanvasGroup")
 	Main.Name = "Main"
 	Main.Size = desiredSize
 	Main.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -184,8 +226,13 @@ function Library.new(config)
 	Main.BackgroundColor3 = Theme.Main
 	Main.BorderSizePixel = 0
 	Main.ClipsDescendants = true
+	Main.GroupTransparency = 1 -- starts hidden; Show() animates it in
 	Main.Parent = ScreenGui
 	corner(Main, CORNER_RADIUS)
+
+	local MainScale = Instance.new("UIScale")
+	MainScale.Scale = 0.9
+	MainScale.Parent = Main
 
 	-- shrink the window if the screen is smaller than the requested size
 	local function fitToScreen()
@@ -274,6 +321,29 @@ function Library.new(config)
 	Content.Parent = Main
 
 	self.ScreenGui, self.Main, self.Sidebar, self.Content = ScreenGui, Main, Sidebar, Content
+	self._scale = MainScale
+	self._visible = false
+
+	-- floating watermark (lives in the ScreenGui, NOT inside Main, so it survives Hide())
+	if config.Watermark ~= false then
+		self:_buildWatermark(config.Title or "RobloxUI")
+	end
+
+	if config.ToggleKey then
+		table.insert(self._connections, UserInputService.InputBegan:Connect(function(input, processed)
+			if not processed and input.KeyCode == config.ToggleKey then
+				self:Toggle()
+			end
+		end))
+	end
+
+	if config.StartHidden then
+		Main.Visible = false
+		self:_updateWatermark()
+	else
+		self:Show()
+	end
+
 	return self
 end
 
@@ -282,14 +352,202 @@ function Library:Destroy()
 		c:Disconnect()
 	end
 	self._connections = {}
+	self._destroyed = true
 	self.ScreenGui:Destroy()
+end
+
+--// ================= SHOW / HIDE =================
+local SHOW_TIME, HIDE_TIME = 0.35, 0.2
+
+function Library:_cancelAnim()
+	if self._anim then
+		for _, t in ipairs(self._anim) do t:Cancel() end
+		self._anim = nil
+	end
+end
+
+function Library:Show()
+	if self._destroyed then return end
+	self._visible = true
+	self:_cancelAnim()
+	self.Main.Visible = true
+	self._anim = {
+		tween(self.Main, { GroupTransparency = 0 }, SHOW_TIME, Enum.EasingStyle.Quint),
+		tween(self._scale, { Scale = 1 }, SHOW_TIME, Enum.EasingStyle.Back),
+	}
+	self:_updateWatermark()
+end
+
+function Library:Hide()
+	if self._destroyed or not self._visible then return end
+	self._visible = false
+	self:_cancelAnim()
+	local fade = tween(self.Main, { GroupTransparency = 1 }, HIDE_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+	local shrink = tween(self._scale, { Scale = 0.92 }, HIDE_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+	self._anim = { fade, shrink }
+	fade.Completed:Connect(function(state)
+		-- only fully hide once the fade finished and nobody re-opened the window meanwhile
+		if state == Enum.PlaybackState.Completed and not self._visible and not self._destroyed then
+			self.Main.Visible = false
+		end
+	end)
+	self:_updateWatermark()
+end
+
+function Library:Toggle()
+	if self._visible then self:Hide() else self:Show() end
+end
+
+function Library:IsVisible()
+	return self._visible == true
+end
+
+--// ================= FLOATING WATERMARK =================
+function Library:_buildWatermark(title)
+	local WM = Instance.new("Frame")
+	WM.Name = "Watermark"
+	WM.AnchorPoint = Vector2.new(0.5, 0)
+	WM.Position = UDim2.new(0.5, 0, 0, -40) -- starts above the screen, slides in below
+	WM.Size = UDim2.new(0, 0, 0, 30)
+	WM.AutomaticSize = Enum.AutomaticSize.X
+	WM.BackgroundColor3 = Theme.Sidebar
+	WM.BorderSizePixel = 0
+	WM.Parent = self.ScreenGui
+	corner(WM, 8)
+
+	local Stroke = Instance.new("UIStroke")
+	Stroke.Color = Theme.Element
+	Stroke.Thickness = 1
+	Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	Stroke.Parent = WM
+
+	local Pad = Instance.new("UIPadding")
+	Pad.PaddingLeft = UDim.new(0, 10)
+	Pad.PaddingRight = UDim.new(0, 4)
+	Pad.Parent = WM
+
+	local Layout = Instance.new("UIListLayout")
+	Layout.FillDirection = Enum.FillDirection.Horizontal
+	Layout.VerticalAlignment = Enum.VerticalAlignment.Center
+	Layout.Padding = UDim.new(0, 8)
+	Layout.SortOrder = Enum.SortOrder.LayoutOrder
+	Layout.Parent = WM
+
+	local Label = Instance.new("TextLabel")
+	Label.Name = "Title"
+	Label.Size = UDim2.new(0, 0, 1, 0)
+	Label.AutomaticSize = Enum.AutomaticSize.X
+	Label.BackgroundTransparency = 1
+	Label.BorderSizePixel = 0
+	Label.Text = title
+	Label.TextColor3 = Theme.SubText
+	Label.Font = Enum.Font.GothamBold
+	Label.TextSize = 13
+	Label.LayoutOrder = 1
+	Label.Parent = WM
+
+	local Button = Instance.new("TextButton")
+	Button.Name = "ToggleButton"
+	Button.Size = UDim2.new(0, 22, 0, 22)
+	Button.BackgroundColor3 = Theme.Element
+	Button.BorderSizePixel = 0
+	Button.Text = ""
+	Button.AutoButtonColor = false
+	Button.LayoutOrder = 2
+	Button.Parent = WM
+	corner(Button, 6)
+
+	local Icon = Instance.new("ImageLabel")
+	Icon.Name = "Icon"
+	Icon.AnchorPoint = Vector2.new(0.5, 0.5)
+	Icon.Position = UDim2.new(0.5, 0, 0.5, 0)
+	Icon.Size = UDim2.new(0, 14, 0, 14)
+	Icon.BackgroundTransparency = 1
+	Icon.BorderSizePixel = 0
+	Icon.ImageColor3 = Theme.IconOn
+	Icon.ScaleType = Enum.ScaleType.Fit
+	Icon.Parent = Button
+
+	-- text fallback if the icon library isn't available
+	local Fallback = Instance.new("TextLabel")
+	Fallback.Name = "IconFallback"
+	Fallback.Size = UDim2.new(1, 0, 1, 0)
+	Fallback.BackgroundTransparency = 1
+	Fallback.TextColor3 = Theme.IconOn
+	Fallback.Font = Enum.Font.GothamBold
+	Fallback.TextSize = 12
+	Fallback.Visible = false
+	Fallback.Parent = Icon
+
+	-- button hover / press feedback
+	local BtnScale = Instance.new("UIScale")
+	BtnScale.Parent = Button
+	Button.MouseEnter:Connect(function() tween(BtnScale, { Scale = 1.1 }, 0.12) end)
+	Button.MouseLeave:Connect(function() tween(BtnScale, { Scale = 1 }, 0.12) end)
+	Button.InputBegan:Connect(function(input)
+		if isPress(input) then tween(BtnScale, { Scale = 0.9 }, 0.08) end
+	end)
+	Button.InputEnded:Connect(function(input)
+		if isPress(input) then tween(BtnScale, { Scale = 1.1 }, 0.15, Enum.EasingStyle.Back) end
+	end)
+	Button.MouseButton1Click:Connect(function()
+		self:Toggle()
+	end)
+
+	-- drag the watermark by its title, clamped to the screen
+	local dragging, dragStart, startPos = false, nil, nil
+	Label.InputBegan:Connect(function(input)
+		if isPress(input) then
+			dragging = true
+			dragStart = input.Position
+			startPos = WM.AbsolutePosition + Vector2.new(WM.AbsoluteSize.X / 2, 0)
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then dragging = false end
+			end)
+		end
+	end)
+	table.insert(self._connections, UserInputService.InputChanged:Connect(function(input)
+		if not dragging then return end
+		if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then
+			return
+		end
+		local delta = input.Position - dragStart
+		local vp = self.ScreenGui.AbsoluteSize
+		local half = WM.AbsoluteSize.X / 2
+		local cx = math.clamp(startPos.X + delta.X, half, math.max(vp.X - half, half))
+		local cy = math.clamp(startPos.Y + delta.Y, 0, math.max(vp.Y - WM.AbsoluteSize.Y, 0))
+		WM.Position = UDim2.fromOffset(cx, cy)
+	end))
+
+	self._wm = { Frame = WM, Button = Button, Icon = Icon, Fallback = Fallback }
+
+	-- slide-in entrance
+	tween(WM, { Position = UDim2.new(0.5, 0, 0, 10) }, 0.5, Enum.EasingStyle.Back)
+end
+
+-- Syncs the watermark button with the window state (accent + eye icon = visible, grey + eye-off = hidden)
+function Library:_updateWatermark()
+	local wm = self._wm
+	if not wm then return end
+	local on = self._visible == true
+
+	tween(wm.Button, { BackgroundColor3 = on and Theme.Accent or Theme.Element }, 0.2)
+
+	local ok = applyIcon(wm.Icon, on and "eye" or "eye-off", self.Icons)
+	if not ok then wm.Icon.Image = "" end
+	wm.Fallback.Visible = not ok
+	wm.Fallback.Text = on and "●" or "○"
+
+	-- small cross-fade on the icon swap
+	wm.Icon.ImageTransparency = 1
+	tween(wm.Icon, { ImageTransparency = 0 }, 0.2)
 end
 
 --// ================= TAB =================
 local function setTabIconColor(tab, color)
-	tab.Icon.ImageColor3 = color
+	tween(tab.Icon, { ImageColor3 = color }, 0.2)
 	if tab.Fallback then
-		tab.Fallback.TextColor3 = color
+		tween(tab.Fallback, { TextColor3 = color }, 0.2)
 	end
 end
 
@@ -399,6 +657,7 @@ function Library:AddTab(config)
 		Button = TabButton,
 		Icon = Icon,
 		Fallback = Fallback,
+		Inner = Inner,
 		_icons = self.Icons,
 		Left = column(1),
 		Right = column(2),
@@ -406,6 +665,9 @@ function Library:AddTab(config)
 	}, Tab)
 
 	table.insert(self.Tabs, tab)
+	addFeedback(TabButton, Theme.Card, Theme.Element, function()
+		return self.ActiveTab == tab
+	end)
 	TabButton.MouseButton1Click:Connect(function()
 		self:SelectTab(tab)
 	end)
@@ -415,15 +677,24 @@ function Library:AddTab(config)
 end
 
 function Library:SelectTab(tab)
-	if self.ActiveTab then
-		self.ActiveTab.Page.Visible = false
-		self.ActiveTab.Button.BackgroundColor3 = Theme.Card
-		setTabIconColor(self.ActiveTab, Theme.IconOff)
-	end
-	tab.Page.Visible = true
-	tab.Button.BackgroundColor3 = Theme.Accent
-	setTabIconColor(tab, Theme.IconOn)
+	if self.ActiveTab == tab then return end
+
+	local previous = self.ActiveTab
 	self.ActiveTab = tab
+
+	if previous then
+		previous.Page.Visible = false
+		tween(previous.Button, { BackgroundColor3 = Theme.Card }, 0.2)
+		setTabIconColor(previous, Theme.IconOff)
+	end
+
+	-- new page slides up into place
+	tab.Inner.Position = UDim2.new(0, 0, 0, 14)
+	tab.Page.Visible = true
+	tween(tab.Inner, { Position = UDim2.new(0, 0, 0, 0) }, 0.3, Enum.EasingStyle.Quint)
+
+	tween(tab.Button, { BackgroundColor3 = Theme.Accent }, 0.2)
+	setTabIconColor(tab, Theme.IconOn)
 end
 
 --// ================= SECTION =================
@@ -486,7 +757,7 @@ function Section:AddButton(config)
 	Btn.Font = Enum.Font.Gotham
 	Btn.TextSize = 14
 	Btn.TextTruncate = Enum.TextTruncate.AtEnd -- long names no longer spill out of the button
-	Btn.AutoButtonColor = true
+	Btn.AutoButtonColor = false
 	Btn.LayoutOrder = self._count
 	Btn.Parent = self.Holder
 	corner(Btn, 6)
@@ -496,7 +767,12 @@ function Section:AddButton(config)
 	BtnPad.PaddingRight = UDim.new(0, 8)
 	BtnPad.Parent = Btn
 
+	addFeedback(Btn, Theme.Element, Theme.Hover)
+
 	Btn.MouseButton1Click:Connect(function()
+		-- quick accent flash that fades back to the hover colour
+		Btn.BackgroundColor3 = Theme.Accent
+		tween(Btn, { BackgroundColor3 = Theme.Hover }, 0.3)
 		if config.Callback then config.Callback() end
 	end)
 
@@ -518,6 +794,7 @@ function Section:AddToggle(config)
 	Row.LayoutOrder = self._count
 	Row.Parent = self.Holder
 	corner(Row, 6)
+	addFeedback(Row, Theme.Element, Theme.Hover)
 
 	local Label = Instance.new("TextLabel")
 	Label.Name = "Label"
@@ -594,6 +871,8 @@ function Section:AddDropdown(config)
 	local selected = {} -- multi mode: [value] = true
 	local buttons = {} -- [value] = TextButton
 	local open = false
+	local listHeight = 0 -- full height of the option list when open
+	local listTween = nil
 
 	-- container grows downward when open, pushing the elements below it (nothing gets clipped)
 	local Container = Instance.new("Frame")
@@ -620,6 +899,7 @@ function Section:AddDropdown(config)
 	Header.LayoutOrder = 1
 	Header.Parent = Container
 	corner(Header, 6)
+	addFeedback(Header, Theme.Element, Theme.Hover)
 
 	local NameLabel = Instance.new("TextLabel")
 	NameLabel.Name = "Name"
@@ -674,9 +954,15 @@ function Section:AddDropdown(config)
 
 	local function setArrow(isOpen)
 		local ok = applyIcon(Arrow, isOpen and "chevron-up" or "chevron-down", self._icons)
-		Arrow.Image = ok and Arrow.Image or ""
+		if not ok then Arrow.Image = "" end
 		ArrowFallback.Visible = not ok
 		ArrowFallback.Text = isOpen and "▲" or "▼"
+
+		-- small cross-fade when the chevron swaps
+		Arrow.ImageTransparency = 1
+		ArrowFallback.TextTransparency = 1
+		tween(Arrow, { ImageTransparency = 0 }, 0.18)
+		tween(ArrowFallback, { TextTransparency = 0 }, 0.18)
 	end
 	setArrow(false)
 
@@ -736,9 +1022,25 @@ function Section:AddDropdown(config)
 	end
 
 	local function setOpen(state)
+		if open == state then return end
 		open = state
-		List.Visible = state
+		if listTween then listTween:Cancel() end
 		setArrow(state)
+
+		if state then
+			-- grow downward
+			List.Visible = true
+			listTween = tween(List, { Size = UDim2.new(1, 0, 0, listHeight) }, 0.22, Enum.EasingStyle.Quint)
+		else
+			-- shrink, then hide once finished (unless it was re-opened meanwhile)
+			local t = tween(List, { Size = UDim2.new(1, 0, 0, 0) }, 0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			listTween = t
+			t.Completed:Connect(function(playbackState)
+				if playbackState == Enum.PlaybackState.Completed and not open then
+					List.Visible = false
+				end
+			end)
+		end
 	end
 
 	local dropdown = { Instance = Container }
@@ -787,7 +1089,8 @@ function Section:AddDropdown(config)
 
 		local n = #options
 		local h = n > 0 and (n * OPTION_HEIGHT + (n - 1) * OPTION_GAP + 8) or 0
-		List.Size = UDim2.new(1, 0, 0, math.min(h, MAX_LIST_HEIGHT))
+		listHeight = math.min(h, MAX_LIST_HEIGHT)
+		List.Size = UDim2.new(1, 0, 0, open and listHeight or 0)
 		refreshVisuals()
 	end
 
