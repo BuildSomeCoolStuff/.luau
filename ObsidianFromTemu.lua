@@ -17,10 +17,7 @@ local Theme = {
 	Card = Color3.fromRGB(30, 30, 35),
 	Element = Color3.fromRGB(40, 40, 46),
 	Hover = Color3.fromRGB(50, 50, 58),
-	Danger = Color3.fromRGB(200, 60, 60),
-	Success = Color3.fromRGB(60, 170, 100),
-	Warning = Color3.fromRGB(225, 160, 50),
-	Off = Color3.fromRGB(65, 65, 74),
+	Danger = Color3.fromRGB(200, 60, 60),	Off = Color3.fromRGB(65, 65, 74),
 	IconOff = Color3.fromRGB(160, 160, 170),
 	IconOn = Color3.fromRGB(255, 255, 255),
 	Accent = Color3.fromRGB(50, 90, 220),
@@ -576,24 +573,10 @@ function Library:_keyTaken(key, except)
 end
 
 --// ================= NOTIFICATIONS =================
--- Window:Notify({ Title = "Saved", Content = "Config loaded", Duration = 4, Type = "success", Icon = "bell" })
--- Type: "info" (default) | "success" | "warning" | "error". Duration = 0 keeps it until clicked.
--- Cards slide down from the top (like the watermark), stack under it, and click to dismiss.
+-- Window:Notify({ Title = "Saved", Content = "Config loaded", Duration = 4 })
+-- Duration = 0 keeps it until clicked.
+-- Cards look like the watermark, slide down from the top, stack under it, and click to dismiss.
 local NOTIFY_WIDTH, NOTIFY_MAX = 280, 5
-local NOTIFY_TYPES = {
-	info = { color = Theme.Accent, glyph = "i", icons = { "info", "bell" } },
-	success = { color = Theme.Success, glyph = "✓", icons = { "circle-check", "check-circle", "check" } },
-	warning = { color = Theme.Warning, glyph = "!", icons = { "triangle-alert", "alert-triangle", "bell" } },
-	error = { color = Theme.Danger, glyph = "✕", icons = { "circle-x", "x-circle", "x" } },
-}
-
--- tries several icon names (lucide renamed a few), silently
-local function applyIconAny(imageObj, names, provider)
-	for _, name in ipairs(names) do
-		if applyIcon(imageObj, name, provider, true) then return true end
-	end
-	return false
-end
 
 function Library:_getNotifyContainer()
 	if self._notifyContainer and self._notifyContainer.Parent then
@@ -628,8 +611,6 @@ function Library:Notify(config)
 	if type(config) == "string" then config = { Content = config } end
 	config = config or {}
 
-	local spec = NOTIFY_TYPES[config.Type or "info"] or NOTIFY_TYPES.info
-	local color = spec.color
 	local duration = tonumber(config.Duration) or 4
 	local container = self:_getNotifyContainer()
 
@@ -671,57 +652,20 @@ function Library:Notify(config)
 	Body.Parent = Card
 
 	local BodyPad = Instance.new("UIPadding")
-	BodyPad.PaddingTop = UDim.new(0, 10)
-	BodyPad.PaddingBottom = UDim.new(0, 10)
-	BodyPad.PaddingLeft = UDim.new(0, 10)
-	BodyPad.PaddingRight = UDim.new(0, 10)
+	BodyPad.PaddingTop = UDim.new(0, 8)
+	BodyPad.PaddingBottom = UDim.new(0, 8)
+	BodyPad.PaddingLeft = UDim.new(0, 12)
+	BodyPad.PaddingRight = UDim.new(0, 12)
 	BodyPad.Parent = Body
 
 	local BodyMin = Instance.new("UISizeConstraint")
-	BodyMin.MinSize = Vector2.new(0, 46)
+	BodyMin.MinSize = Vector2.new(0, 30) -- same height as the watermark
 	BodyMin.Parent = Body
-
-	local Chip = Instance.new("Frame")
-	Chip.Name = "IconChip"
-	Chip.Size = UDim2.new(0, 26, 0, 26)
-	Chip.BackgroundColor3 = color
-	Chip.BackgroundTransparency = 0.8
-	Chip.BorderSizePixel = 0
-	Chip.Parent = Body
-	corner(Chip, 6)
-
-	local Icon = Instance.new("ImageLabel")
-	Icon.Name = "Icon"
-	Icon.AnchorPoint = Vector2.new(0.5, 0.5)
-	Icon.Position = UDim2.new(0.5, 0, 0.5, 0)
-	Icon.Size = UDim2.new(0, 16, 0, 16)
-	Icon.BackgroundTransparency = 1
-	Icon.BorderSizePixel = 0
-	Icon.ImageColor3 = color
-	Icon.ScaleType = Enum.ScaleType.Fit
-	Icon.Parent = Chip
-
-	-- text fallback if the icon library isn't available
-	local Glyph = Instance.new("TextLabel")
-	Glyph.Name = "IconFallback"
-	Glyph.Size = UDim2.new(1, 0, 1, 0)
-	Glyph.BackgroundTransparency = 1
-	Glyph.Text = spec.glyph
-	Glyph.TextColor3 = color
-	Glyph.Font = Enum.Font.GothamBold
-	Glyph.TextSize = 14
-	Glyph.Parent = Icon
-
-	local iconNames = spec.icons
-	if config.Icon then
-		iconNames = { config.Icon, table.unpack(spec.icons) }
-	end
-	Glyph.Visible = not applyIconAny(Icon, iconNames, self.Icons)
 
 	local Texts = Instance.new("Frame")
 	Texts.Name = "Texts"
-	Texts.Position = UDim2.new(0, 36, 0, 0)
-	Texts.Size = UDim2.new(1, -36, 0, 0)
+	Texts.Position = UDim2.new(0, 0, 0, 0)
+	Texts.Size = UDim2.new(1, 0, 0, 0)
 	Texts.AutomaticSize = Enum.AutomaticSize.Y
 	Texts.BackgroundTransparency = 1
 	Texts.BorderSizePixel = 0
@@ -763,7 +707,7 @@ function Library:Notify(config)
 	Bar.AnchorPoint = Vector2.new(0, 1)
 	Bar.Position = UDim2.new(0, 0, 1, 0)
 	Bar.Size = UDim2.new(1, 0, 0, 2)
-	Bar.BackgroundColor3 = color
+	Bar.BackgroundColor3 = Theme.Accent
 	Bar.BorderSizePixel = 0
 	Bar.Visible = duration > 0
 	Bar.Parent = Card
