@@ -16,6 +16,7 @@ local Theme = {
 	Card = Color3.fromRGB(30, 30, 35),
 	Element = Color3.fromRGB(40, 40, 46),
 	Hover = Color3.fromRGB(50, 50, 58),
+	Danger = Color3.fromRGB(200, 60, 60),
 	Off = Color3.fromRGB(65, 65, 74),
 	IconOff = Color3.fromRGB(160, 160, 170),
 	IconOn = Color3.fromRGB(255, 255, 255),
@@ -206,6 +207,10 @@ function Library.new(config)
 	self.Tabs = {}
 	self.ActiveTab = nil
 	self.Icons = config.Icons or loadIcons() -- icon provider with .GetIcon(name); auto-loaded if not passed
+	self._binds = {} -- every registered keybind (one shared input listener dispatches to them)
+	self._cleanups = {} -- [component] = function, run on Library:Destroy (drag listeners etc.)
+	self._listening = nil -- the keybind currently waiting for a key
+	self._toggleKey = config.ToggleKey -- reserved: window show/hide key
 	self._connections = {}
 
 	local ScreenGui = Instance.new("ScreenGui")
@@ -329,13 +334,33 @@ function Library.new(config)
 		self:_buildWatermark(config.Title or "RobloxUI")
 	end
 
-	if config.ToggleKey then
-		table.insert(self._connections, UserInputService.InputBegan:Connect(function(input, processed)
-			if not processed and input.KeyCode == config.ToggleKey then
-				self:Toggle()
+	-- Single shared keyboard listener: rebinding capture, window ToggleKey and every keybind
+	-- go through here, so one key press can never be handled twice or by two systems at once.
+	table.insert(self._connections, UserInputService.InputBegan:Connect(function(input, processed)
+		local listening = self._listening
+		if listening then
+			if input.UserInputType == Enum.UserInputType.Keyboard then
+				listening:_capture(input.KeyCode)
+			elseif isPress(input) and not processed then
+				listening:_stopListening() -- clicked outside the UI: cancel rebinding
 			end
-		end))
-	end
+			return
+		end
+
+		if processed or input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+		local code = input.KeyCode
+
+		if self._toggleKey and code == self._toggleKey then
+			self:Toggle()
+			return
+		end
+
+		for _, kb in ipairs(table.clone(self._binds)) do
+			if kb._key == code and not kb._destroyed then
+				kb._onPress()
+			end
+		end
+	end))
 
 	if config.StartHidden then
 		Main.Visible = false
@@ -353,6 +378,10 @@ function Library:Destroy()
 	end
 	self._connections = {}
 	self._destroyed = true
+	for _, fn in pairs(self._cleanups) do pcall(fn) end -- drag listeners, keybinds
+	self._cleanups = {}
+	self._binds = {}
+	self._listening = nil
 	self.ScreenGui:Destroy()
 end
 
@@ -400,6 +429,16 @@ end
 
 function Library:IsVisible()
 	return self._visible == true
+end
+
+-- True if `key` is already used by the window ToggleKey or by another keybind.
+function Library:_keyTaken(key, except)
+	if not key then return false end
+	if key == self._toggleKey then return true end
+	for _, kb in ipairs(self._binds) do
+		if kb ~= except and kb._key == key then return true end
+	end
+	return false
 end
 
 --// ================= FLOATING WATERMARK =================
@@ -659,6 +698,7 @@ function Library:AddTab(config)
 		Fallback = Fallback,
 		Inner = Inner,
 		_icons = self.Icons,
+		_lib = self,
 		Left = column(1),
 		Right = column(2),
 		_sectionCount = 0,
@@ -740,7 +780,161 @@ function Tab:AddSection(name, side)
 		Title.Parent = Holder
 	end
 
-	return setmetatable({ Holder = Holder, _count = 0, _icons = self._icons }, Section)
+	return setmetatable({ Holder = Holder, _count = 0, _icons = self._icons, _lib = self._lib }, Section)
+end
+
+--// ================= KEYBIND (shared by Toggle:AddKeybind and Section:AddKeybind) =================
+local function resolveKey(key)
+	if typeof(key) == "EnumItem" and key.EnumType == Enum.KeyCode then return key end
+	if type(key) == "string" then
+		local ok, res = pcall(function() return Enum.KeyCode[key] end)
+		if ok then return res end
+	end
+	return nil
+end
+
+-- Builds the small key "chip" button and registers it with the library's shared key listener.
+--   config.Key          initial Enum.KeyCode (optional)
+--   config.CanBeChanged false = fixed key, no rebinding UI (default true)
+--   config.Callback     fired with the new Enum.KeyCode, or nil when the binding is cleared
+--   onPress             called when the bound key is pressed
+local function createKeybind(lib, parent, config, position, onPress)
+	config = config or {}
+	local canChange = config.CanBeChanged ~= false
+	local conns = {}
+	local kb = { _key = nil, _onPress = onPress, _isListening = false, _destroyed = false }
+
+	local Chip = Instance.new("TextButton")
+	Chip.Name = "Keybind"
+	Chip.AnchorPoint = Vector2.new(1, 0.5)
+	Chip.Position = position
+	Chip.Size = UDim2.new(0, 0, 0, 20)
+	Chip.AutomaticSize = Enum.AutomaticSize.X
+	Chip.BackgroundColor3 = Theme.Card
+	Chip.BorderSizePixel = 0
+	Chip.Text = "None"
+	Chip.TextColor3 = Theme.SubText
+	Chip.Font = Enum.Font.Gotham
+	Chip.TextSize = 12
+	Chip.TextTruncate = Enum.TextTruncate.AtEnd
+	Chip.AutoButtonColor = false
+	Chip.Parent = parent
+	corner(Chip, 5)
+	kb.Instance = Chip
+
+	local ChipPad = Instance.new("UIPadding")
+	ChipPad.PaddingLeft = UDim.new(0, 7)
+	ChipPad.PaddingRight = UDim.new(0, 7)
+	ChipPad.Parent = Chip
+
+	local ChipLimit = Instance.new("UISizeConstraint")
+	ChipLimit.MinSize = Vector2.new(30, 20)
+	ChipLimit.MaxSize = Vector2.new(96, 20)
+	ChipLimit.Parent = Chip
+
+	local function render()
+		if kb._isListening then
+			Chip.Text = "..."
+		else
+			Chip.Text = kb._key and kb._key.Name or "None"
+		end
+	end
+
+	local function flashError()
+		Chip.BackgroundColor3 = Theme.Danger
+		tween(Chip, { BackgroundColor3 = Theme.Card }, 0.45)
+	end
+
+	-- Assign (or clear with nil) the key. Returns false if the key is already in use.
+	function kb:Set(key, silent)
+		key = resolveKey(key)
+		if key and lib:_keyTaken(key, kb) then
+			warn("[RobloxUI] key already in use:", key.Name)
+			flashError()
+			return false
+		end
+		kb._key = key
+		render()
+		if not silent and config.Callback then config.Callback(key) end
+		return true
+	end
+
+	function kb:Get()
+		return kb._key
+	end
+
+	function kb:_startListening()
+		if lib._listening and lib._listening ~= kb then
+			lib._listening:_stopListening()
+		end
+		lib._listening = kb
+		kb._isListening = true
+		tween(Chip, { BackgroundColor3 = Theme.Accent }, 0.15)
+		render()
+	end
+
+	function kb:_stopListening()
+		if lib._listening == kb then lib._listening = nil end
+		kb._isListening = false
+		tween(Chip, { BackgroundColor3 = Theme.Card }, 0.15)
+		render()
+	end
+
+	-- Called by the shared listener while this keybind is waiting for a key.
+	-- Escape cancels, Backspace/Delete clears, anything else is assigned.
+	function kb:_capture(code)
+		if code == Enum.KeyCode.Unknown then return end
+		kb:_stopListening()
+		if code == Enum.KeyCode.Escape then return end
+		if code == Enum.KeyCode.Backspace or code == Enum.KeyCode.Delete then
+			kb:Set(nil)
+		else
+			kb:Set(code)
+		end
+	end
+
+	function kb:Destroy()
+		if kb._destroyed then return end
+		kb._destroyed = true
+		if lib._listening == kb then lib._listening = nil end
+		local i = table.find(lib._binds, kb)
+		if i then table.remove(lib._binds, i) end
+		lib._cleanups[kb] = nil
+		for _, c in ipairs(conns) do c:Disconnect() end
+		conns = {}
+		Chip:Destroy()
+	end
+
+	if canChange then
+		addFeedback(Chip, Theme.Card, Theme.Sidebar, function() return kb._isListening end)
+		table.insert(conns, Chip.MouseButton1Click:Connect(function()
+			if kb._isListening then kb:_stopListening() else kb:_startListening() end
+		end))
+		-- right-click clears the binding
+		table.insert(conns, Chip.MouseButton2Click:Connect(function()
+			if kb._isListening then kb:_stopListening() end
+			kb:Set(nil)
+		end))
+	end
+
+	if config.Key ~= nil then
+		kb:Set(config.Key, true) -- initial key: no callback
+	end
+	table.insert(lib._binds, kb)
+	lib._cleanups[kb] = function() kb:Destroy() end
+
+	return kb
+end
+
+-- Keeps a row's label from running underneath the key chip.
+local function fitLabelToKeybind(label, kb, reserve)
+	local chip = kb.Instance
+	local function fit()
+		local w = math.clamp(chip.TextBounds.X + 14, 30, 96)
+		label.Size = UDim2.new(1, -(reserve + w + 6), 1, 0)
+	end
+	fit()
+	chip:GetPropertyChangedSignal("TextBounds"):Connect(fit)
 end
 
 function Section:AddButton(config)
@@ -783,6 +977,7 @@ function Section:AddToggle(config)
 	config = config or {}
 	self._count += 1
 	local state = config.Default == true
+	local section = self
 
 	local Row = Instance.new("TextButton")
 	Row.Name = "Toggle"
@@ -855,7 +1050,296 @@ function Section:AddToggle(config)
 		toggle:Set(not state)
 	end)
 
+	-- Chain onto the same toggle: AddToggle({...}):AddKeybind({...})
+	-- Pressing the key flips THIS toggle and fires its normal Callback; rebinding only
+	-- changes the key, so the toggle and its callback are never recreated or disconnected.
+	function toggle:AddKeybind(kbConfig)
+		if toggle.Keybind then
+			warn("[RobloxUI] this toggle already has a keybind")
+			return toggle.Keybind
+		end
+
+		local kb = createKeybind(section._lib, Row, kbConfig, UDim2.new(1, -48, 0.5, 0), function()
+			toggle:Set(not state)
+		end)
+		fitLabelToKeybind(Label, kb, 60)
+
+		local baseDestroy = kb.Destroy
+		function kb:Destroy()
+			baseDestroy(kb)
+			toggle.Keybind = nil
+			Label.Size = UDim2.new(1, -60, 1, 0)
+		end
+
+		toggle.Keybind = kb
+		return kb
+	end
+
+	function toggle:Destroy()
+		if toggle._destroyed then return end
+		toggle._destroyed = true
+		if toggle.Keybind then toggle.Keybind:Destroy() end
+		Row:Destroy()
+	end
+
 	return toggle
+end
+
+-- Standalone keybind row. Callback(key) fires when the binding changes (key or nil);
+-- OnPress() fires when the bound key is pressed.
+function Section:AddKeybind(config)
+	config = config or {}
+	self._count += 1
+
+	local Row = Instance.new("Frame")
+	Row.Name = "KeybindRow"
+	Row.Size = UDim2.new(1, 0, 0, 32)
+	Row.BackgroundColor3 = Theme.Element
+	Row.BorderSizePixel = 0
+	Row.LayoutOrder = self._count
+	Row.Parent = self.Holder
+	corner(Row, 6)
+
+	local Label = Instance.new("TextLabel")
+	Label.Name = "Label"
+	Label.Position = UDim2.new(0, 8, 0, 0)
+	Label.Size = UDim2.new(1, -60, 1, 0)
+	Label.BackgroundTransparency = 1
+	Label.BorderSizePixel = 0
+	Label.Text = config.Name or "Keybind"
+	Label.TextColor3 = Theme.Text
+	Label.Font = Enum.Font.Gotham
+	Label.TextSize = 14
+	Label.TextXAlignment = Enum.TextXAlignment.Left
+	Label.TextTruncate = Enum.TextTruncate.AtEnd
+	Label.Parent = Row
+
+	local kb = createKeybind(self._lib, Row, config, UDim2.new(1, -8, 0.5, 0), function()
+		if config.OnPress then config.OnPress() end
+	end)
+	fitLabelToKeybind(Label, kb, 16)
+
+	kb.Row = Row
+	local baseDestroy = kb.Destroy
+	function kb:Destroy()
+		baseDestroy(kb)
+		Row:Destroy()
+	end
+
+	return kb
+end
+
+function Section:AddSlider(config)
+	config = config or {}
+	self._count += 1
+	local lib = self._lib
+
+	local function decimalsOf(n)
+		return #(tostring(n):match("%.(%d+)") or "")
+	end
+
+	local min = tonumber(config.Min) or 0
+	local max = tonumber(config.Max) or 100
+	if max < min then min, max = max, min end
+	local increment = tonumber(config.Increment) or 1
+	if increment <= 0 then increment = 1 end
+	local decimals = math.max(decimalsOf(increment), decimalsOf(min))
+	local suffix = config.ValueName -- shown after the number, e.g. "16 Speed"
+
+	-- clamp to [min, max], snap to Increment, strip float noise
+	local function snap(v)
+		v = math.clamp(v, min, max)
+		v = min + math.floor((v - min) / increment + 0.5) * increment
+		v = math.clamp(v, min, max)
+		local p = 10 ^ decimals
+		return math.floor(v * p + 0.5) / p
+	end
+
+	local function toAlpha(v)
+		return max > min and (v - min) / (max - min) or 0
+	end
+
+	local function format(v)
+		local s = decimals > 0 and string.format("%." .. decimals .. "f", v) or tostring(v)
+		if suffix and suffix ~= "" then s = s .. " " .. tostring(suffix) end
+		return s
+	end
+
+	local value = snap(tonumber(config.Default) or min)
+	local hovering, dragging = false, false
+	local dragConns = nil
+
+	local Holder = Instance.new("Frame")
+	Holder.Name = "Slider"
+	Holder.Size = UDim2.new(1, 0, 0, 46)
+	Holder.BackgroundColor3 = Theme.Element
+	Holder.BorderSizePixel = 0
+	Holder.LayoutOrder = self._count
+	Holder.Parent = self.Holder
+	corner(Holder, 6)
+
+	local NameLabel = Instance.new("TextLabel")
+	NameLabel.Name = "Name"
+	NameLabel.Position = UDim2.new(0, 8, 0, 6)
+	NameLabel.Size = UDim2.new(0.6, -8, 0, 16)
+	NameLabel.BackgroundTransparency = 1
+	NameLabel.BorderSizePixel = 0
+	NameLabel.Text = config.Name or "Slider"
+	NameLabel.TextColor3 = Theme.Text
+	NameLabel.Font = Enum.Font.Gotham
+	NameLabel.TextSize = 14
+	NameLabel.TextXAlignment = Enum.TextXAlignment.Left
+	NameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+	NameLabel.Parent = Holder
+
+	local ValueLabel = Instance.new("TextLabel")
+	ValueLabel.Name = "Value"
+	ValueLabel.Position = UDim2.new(0.6, 0, 0, 6)
+	ValueLabel.Size = UDim2.new(0.4, -8, 0, 16)
+	ValueLabel.BackgroundTransparency = 1
+	ValueLabel.BorderSizePixel = 0
+	ValueLabel.Text = format(value)
+	ValueLabel.TextColor3 = Theme.SubText
+	ValueLabel.Font = Enum.Font.GothamBold
+	ValueLabel.TextSize = 13
+	ValueLabel.TextXAlignment = Enum.TextXAlignment.Right
+	ValueLabel.TextTruncate = Enum.TextTruncate.AtEnd
+	ValueLabel.Parent = Holder
+
+	-- inset so the knob stays inside the card even at both ends
+	local Track = Instance.new("Frame")
+	Track.Name = "Track"
+	Track.Position = UDim2.new(0, 15, 0, 31)
+	Track.Size = UDim2.new(1, -30, 0, 6)
+	Track.BackgroundColor3 = Theme.Off
+	Track.BorderSizePixel = 0
+	Track.Parent = Holder
+	corner(Track, 3)
+
+	local Fill = Instance.new("Frame")
+	Fill.Name = "Fill"
+	Fill.Size = UDim2.new(toAlpha(value), 0, 1, 0)
+	Fill.BackgroundColor3 = Theme.Accent
+	Fill.BorderSizePixel = 0
+	Fill.Parent = Track
+	corner(Fill, 3)
+
+	local Knob = Instance.new("Frame")
+	Knob.Name = "Knob"
+	Knob.AnchorPoint = Vector2.new(0.5, 0.5)
+	Knob.Position = UDim2.new(toAlpha(value), 0, 0.5, 0)
+	Knob.Size = UDim2.new(0, 14, 0, 14)
+	Knob.BackgroundColor3 = Theme.Text
+	Knob.BorderSizePixel = 0
+	Knob.Parent = Track
+	local KnobCorner = Instance.new("UICorner")
+	KnobCorner.CornerRadius = UDim.new(1, 0)
+	KnobCorner.Parent = Knob
+
+	-- transparent hit area over the whole card (a TextButton, so it also blocks window dragging)
+	local Hit = Instance.new("TextButton")
+	Hit.Name = "Hit"
+	Hit.Size = UDim2.new(1, 0, 1, 0)
+	Hit.BackgroundTransparency = 1
+	Hit.BorderSizePixel = 0
+	Hit.Text = ""
+	Hit.AutoButtonColor = false
+	Hit.Parent = Holder
+
+	local function look()
+		local active = hovering or dragging
+		tween(Holder, { BackgroundColor3 = active and Theme.Hover or Theme.Element }, 0.12)
+		local size = dragging and 18 or (hovering and 16 or 14)
+		tween(Knob, { Size = UDim2.new(0, size, 0, size) }, 0.12, Enum.EasingStyle.Back)
+	end
+
+	local function render(duration)
+		local a = toAlpha(value)
+		tween(Fill, { Size = UDim2.new(a, 0, 1, 0) }, duration)
+		tween(Knob, { Position = UDim2.new(a, 0, 0.5, 0) }, duration)
+		ValueLabel.Text = format(value)
+	end
+
+	local function apply(v, silent, duration)
+		v = snap(v)
+		local changed = v ~= value
+		value = v
+		render(duration)
+		if changed then
+			ValueLabel.TextColor3 = Theme.Text -- brief highlight on change
+			tween(ValueLabel, { TextColor3 = Theme.SubText }, 0.3)
+			if not silent and config.Callback then config.Callback(value) end
+		end
+	end
+
+	local function updateFromX(x)
+		local w = Track.AbsoluteSize.X
+		if w <= 0 then return end
+		apply(min + ((x - Track.AbsolutePosition.X) / w) * (max - min), false, 0.08)
+	end
+
+	-- drag listeners only exist while a drag is active
+	local function stopDrag()
+		if dragConns then
+			for _, c in ipairs(dragConns) do c:Disconnect() end
+			dragConns = nil
+		end
+		if dragging then
+			dragging = false
+			look()
+		end
+	end
+
+	local function startDrag(input)
+		stopDrag()
+		dragging = true
+		look()
+		updateFromX(input.Position.X)
+		dragConns = {
+			UserInputService.InputChanged:Connect(function(i)
+				if i.UserInputType == Enum.UserInputType.MouseMovement or i == input then
+					updateFromX(i.Position.X)
+				end
+			end),
+			UserInputService.InputEnded:Connect(function(i)
+				if i == input or i.UserInputType == Enum.UserInputType.MouseButton1 then
+					stopDrag()
+				end
+			end),
+		}
+	end
+
+	Hit.InputBegan:Connect(function(input)
+		if isPress(input) then startDrag(input) end
+	end)
+	Hit.MouseEnter:Connect(function()
+		hovering = true
+		look()
+	end)
+	Hit.MouseLeave:Connect(function()
+		hovering = false
+		look()
+	end)
+
+	local slider = { Instance = Holder }
+
+	function slider:Set(v, silent)
+		apply(tonumber(v) or value, silent, 0.2)
+	end
+
+	function slider:Get()
+		return value
+	end
+
+	function slider:Destroy()
+		stopDrag()
+		lib._cleanups[slider] = nil
+		Holder:Destroy()
+	end
+
+	lib._cleanups[slider] = stopDrag -- Library:Destroy() while mid-drag won't leak listeners
+
+	return slider
 end
 
 function Section:AddDropdown(config)
