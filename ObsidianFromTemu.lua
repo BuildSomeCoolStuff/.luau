@@ -325,6 +325,130 @@ function Library.new(config)
 	Content.ClipsDescendants = true
 	Content.Parent = Main
 
+	-- resize grip: bottom-right corner, lucide "expand" icon
+	if config.Resizable ~= false then
+		local minSize = config.MinSize or Vector2.new(380, 260)
+		local maxSize = config.MaxSize -- optional Vector2
+
+		local Grip = Instance.new("TextButton")
+		Grip.Name = "ResizeGrip"
+		Grip.AnchorPoint = Vector2.new(1, 1)
+		Grip.Position = UDim2.new(1, -6, 1, -6)
+		Grip.Size = UDim2.new(0, 22, 0, 22)
+		Grip.BackgroundColor3 = Theme.Main
+		Grip.BackgroundTransparency = 0.25
+		Grip.BorderSizePixel = 0
+		Grip.Text = ""
+		Grip.AutoButtonColor = false
+		Grip.Parent = Main -- created after Content, so it draws above the pages
+		corner(Grip, 6)
+
+		local GripIcon = Instance.new("ImageLabel")
+		GripIcon.Name = "Icon"
+		GripIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+		GripIcon.Position = UDim2.new(0.5, 0, 0.5, 0)
+		GripIcon.Size = UDim2.new(0, 14, 0, 14)
+		GripIcon.BackgroundTransparency = 1
+		GripIcon.BorderSizePixel = 0
+		GripIcon.ImageColor3 = Theme.IconOff
+		GripIcon.ScaleType = Enum.ScaleType.Fit
+		GripIcon.Parent = Grip
+
+		-- text fallback if the icon library isn't available
+		local GripFallback = Instance.new("TextLabel")
+		GripFallback.Name = "IconFallback"
+		GripFallback.Size = UDim2.new(1, 0, 1, 0)
+		GripFallback.BackgroundTransparency = 1
+		GripFallback.Text = "⤢"
+		GripFallback.TextColor3 = Theme.IconOff
+		GripFallback.Font = Enum.Font.GothamBold
+		GripFallback.TextSize = 14
+		GripFallback.Parent = GripIcon
+		GripFallback.Visible = not applyIcon(GripIcon, "expand", self.Icons)
+
+		local GripScale = Instance.new("UIScale")
+		GripScale.Parent = Grip
+
+		local hovering, resizing, resizeConns = false, false, nil
+
+		local function gripLook()
+			local on = hovering or resizing
+			local c = on and Theme.IconOn or Theme.IconOff
+			tween(GripIcon, { ImageColor3 = c }, 0.15)
+			tween(GripFallback, { TextColor3 = c }, 0.15)
+			tween(Grip, { BackgroundColor3 = on and Theme.Hover or Theme.Main }, 0.15)
+		end
+
+		-- resize listeners only exist while a resize drag is active
+		local function stopResize()
+			if resizeConns then
+				for _, c in ipairs(resizeConns) do c:Disconnect() end
+				resizeConns = nil
+			end
+			if resizing then
+				resizing = false
+				gripLook()
+				tween(GripScale, { Scale = hovering and 1.1 or 1 }, 0.18, Enum.EasingStyle.Back)
+			end
+		end
+
+		local function startResize(input)
+			stopResize()
+			resizing = true
+			gripLook()
+			tween(GripScale, { Scale = 0.9 }, 0.08)
+
+			local s = MainScale.Scale
+			local startPos = input.Position
+			local startSize = Main.AbsoluteSize / s
+			local topLeft = Main.AbsolutePosition
+
+			resizeConns = {
+				UserInputService.InputChanged:Connect(function(i)
+					if i.UserInputType ~= Enum.UserInputType.MouseMovement and i ~= input then return end
+					local delta = i.Position - startPos
+					local vp = ScreenGui.AbsoluteSize
+
+					-- keep the window on screen and within Min/MaxSize
+					local maxW = math.max(minSize.X, vp.X - topLeft.X - 4)
+					local maxH = math.max(minSize.Y, vp.Y - topLeft.Y - 4)
+					if maxSize then
+						maxW = math.max(minSize.X, math.min(maxW, maxSize.X))
+						maxH = math.max(minSize.Y, math.min(maxH, maxSize.Y))
+					end
+					local w = math.clamp(startSize.X + delta.X / s, minSize.X, maxW)
+					local h = math.clamp(startSize.Y + delta.Y / s, minSize.Y, maxH)
+
+					-- Main is centre-anchored; move the centre so the top-left corner stays put
+					desiredSize = UDim2.fromOffset(w, h) -- also what fitToScreen() uses from now on
+					Main.Size = desiredSize
+					Main.Position = UDim2.fromOffset(topLeft.X + w * s / 2, topLeft.Y + h * s / 2)
+				end),
+				UserInputService.InputEnded:Connect(function(i)
+					if i == input or i.UserInputType == Enum.UserInputType.MouseButton1 then
+						stopResize()
+					end
+				end),
+			}
+		end
+
+		Grip.InputBegan:Connect(function(input)
+			if isPress(input) then startResize(input) end
+		end)
+		Grip.MouseEnter:Connect(function()
+			hovering = true
+			gripLook()
+			if not resizing then tween(GripScale, { Scale = 1.1 }, 0.12) end
+		end)
+		Grip.MouseLeave:Connect(function()
+			hovering = false
+			gripLook()
+			if not resizing then tween(GripScale, { Scale = 1 }, 0.12) end
+		end)
+
+		self._cleanups[Grip] = stopResize
+	end
+
 	self.ScreenGui, self.Main, self.Sidebar, self.Content = ScreenGui, Main, Sidebar, Content
 	self._scale = MainScale
 	self._visible = false
@@ -340,7 +464,10 @@ function Library.new(config)
 		local listening = self._listening
 		if listening then
 			if input.UserInputType == Enum.UserInputType.Keyboard then
-				listening:_capture(input.KeyCode)
+				-- ignore typing while a textbox has focus
+				if not UserInputService:GetFocusedTextBox() then
+					listening:_capture(input.KeyCode)
+				end
 			elseif isPress(input) and not processed then
 				listening:_stopListening() -- clicked outside the UI: cancel rebinding
 			end
@@ -411,6 +538,10 @@ function Library:Hide()
 	if self._destroyed or not self._visible then return end
 	self._visible = false
 	self:_cancelAnim()
+	-- drop textbox focus so the keyboard isn't captured by a hidden window
+	local focused = UserInputService:GetFocusedTextBox()
+	if focused and focused:IsDescendantOf(self.Main) then focused:ReleaseFocus() end
+
 	local fade = tween(self.Main, { GroupTransparency = 1 }, HIDE_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 	local shrink = tween(self._scale, { Scale = 0.92 }, HIDE_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 	self._anim = { fade, shrink }
@@ -1083,6 +1214,194 @@ function Section:AddToggle(config)
 	end
 
 	return toggle
+end
+
+-- Textbox. Callback fires when the box loses focus (Enter or click away):
+--   Callback(text, enterPressed)            -- string
+--   Callback(number, enterPressed)          -- when Numeric = true (invalid input reverts to the last value)
+-- Options: Name, Default, Placeholder, ClearTextOnFocus, MaxLength, Numeric, Min, Max
+function Section:AddTextbox(config)
+	config = config or {}
+	self._count += 1
+
+	local numeric = config.Numeric == true
+	local maxLength = tonumber(config.MaxLength)
+	local hasName = config.Name ~= nil and config.Name ~= ""
+	local focused, hovering, filtering = false, false, false
+
+	local function clampNumber(n)
+		if config.Min then n = math.max(n, config.Min) end
+		if config.Max then n = math.min(n, config.Max) end
+		return n
+	end
+
+	local value
+	if numeric then
+		value = tonumber(config.Default)
+		if value then value = clampNumber(value) end
+	else
+		value = tostring(config.Default or "")
+	end
+
+	local function toText(v)
+		return v == nil and "" or tostring(v)
+	end
+
+	-- keeps digits, a single dot and a leading minus
+	local function filterNumeric(s)
+		local neg = s:sub(1, 1) == "-"
+		s = s:gsub("[^%d%.]", "")
+		local first = s:find(".", 1, true)
+		if first then
+			local rest = s:sub(first + 1):gsub("%.", "")
+			s = s:sub(1, first) .. rest
+		end
+		return (neg and "-" or "") .. s
+	end
+
+	local Row = Instance.new("Frame")
+	Row.Name = "Textbox"
+	Row.Size = UDim2.new(1, 0, 0, 32)
+	Row.BackgroundColor3 = Theme.Element
+	Row.BorderSizePixel = 0
+	Row.LayoutOrder = self._count
+	Row.Parent = self.Holder
+	corner(Row, 6)
+
+	if hasName then
+		local Label = Instance.new("TextLabel")
+		Label.Name = "Label"
+		Label.Position = UDim2.new(0, 8, 0, 0)
+		Label.Size = UDim2.new(0.4, -8, 1, 0)
+		Label.BackgroundTransparency = 1
+		Label.BorderSizePixel = 0
+		Label.Text = config.Name
+		Label.TextColor3 = Theme.Text
+		Label.Font = Enum.Font.Gotham
+		Label.TextSize = 14
+		Label.TextXAlignment = Enum.TextXAlignment.Left
+		Label.TextTruncate = Enum.TextTruncate.AtEnd
+		Label.Parent = Row
+	end
+
+	local BoxHolder = Instance.new("Frame")
+	BoxHolder.Name = "BoxHolder"
+	BoxHolder.AnchorPoint = Vector2.new(1, 0.5)
+	BoxHolder.Position = UDim2.new(1, -6, 0.5, 0)
+	BoxHolder.Size = hasName and UDim2.new(0.6, -10, 0, 22) or UDim2.new(1, -12, 0, 22)
+	BoxHolder.BackgroundColor3 = Theme.Card
+	BoxHolder.BorderSizePixel = 0
+	BoxHolder.Parent = Row
+	corner(BoxHolder, 5)
+
+	local Stroke = Instance.new("UIStroke")
+	Stroke.Color = Theme.Accent
+	Stroke.Thickness = 1
+	Stroke.Transparency = 1 -- fades in while focused
+	Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	Stroke.Parent = BoxHolder
+
+	local Box = Instance.new("TextBox")
+	Box.Name = "Input"
+	Box.Size = UDim2.new(1, 0, 1, 0)
+	Box.BackgroundTransparency = 1
+	Box.BorderSizePixel = 0
+	Box.Text = toText(value)
+	Box.PlaceholderText = config.Placeholder or ""
+	Box.PlaceholderColor3 = Theme.IconOff
+	Box.TextColor3 = Theme.Text
+	Box.Font = Enum.Font.Gotham
+	Box.TextSize = 13
+	Box.TextXAlignment = Enum.TextXAlignment.Left
+	Box.ClearTextOnFocus = config.ClearTextOnFocus == true
+	Box.ClipsDescendants = true
+	Box.Parent = BoxHolder
+
+	local BoxPad = Instance.new("UIPadding")
+	BoxPad.PaddingLeft = UDim.new(0, 6)
+	BoxPad.PaddingRight = UDim.new(0, 6)
+	BoxPad.Parent = Box
+
+	local function look()
+		tween(BoxHolder, { BackgroundColor3 = (hovering and not focused) and Theme.Sidebar or Theme.Card }, 0.12)
+		tween(Stroke, { Transparency = focused and 0 or 1 }, 0.15)
+	end
+
+	-- live filtering (numeric characters / max length)
+	Box:GetPropertyChangedSignal("Text"):Connect(function()
+		if filtering then return end
+		local t = Box.Text
+		if numeric then t = filterNumeric(t) end
+		if maxLength and #t > maxLength then t = t:sub(1, maxLength) end
+		if t ~= Box.Text then
+			filtering = true
+			Box.Text = t
+			filtering = false
+		end
+	end)
+
+	Box.Focused:Connect(function()
+		focused = true
+		look()
+	end)
+
+	Box.FocusLost:Connect(function(enterPressed)
+		focused = false
+		look()
+
+		if numeric then
+			local n = tonumber(Box.Text)
+			if n == nil then
+				Box.Text = toText(value) -- invalid / empty: revert
+				return
+			end
+			n = clampNumber(n)
+			value = n
+			Box.Text = toText(n)
+		else
+			value = Box.Text
+		end
+		if config.Callback then config.Callback(value, enterPressed) end
+	end)
+
+	BoxHolder.MouseEnter:Connect(function()
+		hovering = true
+		look()
+	end)
+	BoxHolder.MouseLeave:Connect(function()
+		hovering = false
+		look()
+	end)
+
+	local textbox = { Instance = Row }
+
+	function textbox:Set(v, silent)
+		if numeric then
+			local n = tonumber(v)
+			if n == nil then return end
+			value = clampNumber(n)
+		else
+			value = tostring(v == nil and "" or v)
+			if maxLength then value = value:sub(1, maxLength) end
+		end
+		Box.Text = toText(value)
+		if not silent and config.Callback then config.Callback(value, false) end
+	end
+
+	function textbox:Get()
+		return value
+	end
+
+	function textbox:Focus()
+		Box:CaptureFocus()
+	end
+
+	function textbox:Destroy()
+		if Box:IsFocused() then Box:ReleaseFocus() end
+		Row:Destroy()
+	end
+
+	return textbox
 end
 
 -- Standalone keybind row. Callback(key) fires when the binding changes (key or nil);
