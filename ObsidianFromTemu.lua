@@ -141,6 +141,16 @@ local function protectGui(gui)
 	end
 end
 
+-- Loads the icon library (lucide by default). Returns nil if it can't be loaded.
+local function loadIcons()
+	local ok, res = pcall(function()
+		return loadstring(game:HttpGetAsync("https://raw.githubusercontent.com/Footagesus/Icons/main/Main-v2.lua"))()
+	end)
+	if ok and res then return res end
+	warn("[RobloxUI] failed to load icon library:", res)
+	return nil
+end
+
 local function corner(obj, r)
 	local c = Instance.new("UICorner")
 	c.CornerRadius = UDim.new(0, r or 6)
@@ -154,7 +164,7 @@ function Library.new(config)
 	local self = setmetatable({}, Library)
 	self.Tabs = {}
 	self.ActiveTab = nil
-	self.Icons = config.Icons -- optional icon provider with .GetIcon(name)
+	self.Icons = config.Icons or loadIcons() -- icon provider with .GetIcon(name); auto-loaded if not passed
 	self._connections = {}
 
 	local ScreenGui = Instance.new("ScreenGui")
@@ -389,6 +399,7 @@ function Library:AddTab(config)
 		Button = TabButton,
 		Icon = Icon,
 		Fallback = Fallback,
+		_icons = self.Icons,
 		Left = column(1),
 		Right = column(2),
 		_sectionCount = 0,
@@ -458,7 +469,7 @@ function Tab:AddSection(name, side)
 		Title.Parent = Holder
 	end
 
-	return setmetatable({ Holder = Holder, _count = 0 }, Section)
+	return setmetatable({ Holder = Holder, _count = 0, _icons = self._icons }, Section)
 end
 
 function Section:AddButton(config)
@@ -638,18 +649,36 @@ function Section:AddDropdown(config)
 	ValueLabel.TextTruncate = Enum.TextTruncate.AtEnd
 	ValueLabel.Parent = Header
 
-	local Arrow = Instance.new("TextLabel")
+	local Arrow = Instance.new("ImageLabel")
 	Arrow.Name = "Arrow"
 	Arrow.AnchorPoint = Vector2.new(1, 0.5)
 	Arrow.Position = UDim2.new(1, -8, 0.5, 0)
-	Arrow.Size = UDim2.new(0, 14, 0, 14)
+	Arrow.Size = UDim2.new(0, 16, 0, 16)
 	Arrow.BackgroundTransparency = 1
 	Arrow.BorderSizePixel = 0
-	Arrow.Text = "▼"
-	Arrow.TextColor3 = Theme.SubText
-	Arrow.Font = Enum.Font.Gotham
-	Arrow.TextSize = 9
+	Arrow.ImageColor3 = Theme.SubText
+	Arrow.ScaleType = Enum.ScaleType.Fit
 	Arrow.Parent = Header
+
+	-- text fallback if the icon library isn't available
+	local ArrowFallback = Instance.new("TextLabel")
+	ArrowFallback.Name = "ArrowFallback"
+	ArrowFallback.Size = UDim2.new(1, 0, 1, 0)
+	ArrowFallback.BackgroundTransparency = 1
+	ArrowFallback.Text = "▼"
+	ArrowFallback.TextColor3 = Theme.SubText
+	ArrowFallback.Font = Enum.Font.Gotham
+	ArrowFallback.TextSize = 9
+	ArrowFallback.Visible = false
+	ArrowFallback.Parent = Arrow
+
+	local function setArrow(isOpen)
+		local ok = applyIcon(Arrow, isOpen and "chevron-up" or "chevron-down", self._icons)
+		Arrow.Image = ok and Arrow.Image or ""
+		ArrowFallback.Visible = not ok
+		ArrowFallback.Text = isOpen and "▲" or "▼"
+	end
+	setArrow(false)
 
 	local List = Instance.new("ScrollingFrame")
 	List.Name = "List"
@@ -709,7 +738,7 @@ function Section:AddDropdown(config)
 	local function setOpen(state)
 		open = state
 		List.Visible = state
-		Arrow.Rotation = state and 180 or 0
+		setArrow(state)
 	end
 
 	local dropdown = { Instance = Container }
