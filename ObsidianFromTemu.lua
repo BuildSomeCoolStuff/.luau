@@ -1,16 +1,3 @@
---[[
-	RobloxUI Library
-	- icon-only sidebar, no title bar
-	- split layout (left / right columns per tab)
-	- Tab:AddSection(name, "left" | "right") -> Section:AddButton({Name, Callback})
-
-	local Library = loadstring(...)()
-	local Window  = Library.new({ Size = UDim2.new(0, 600, 0, 400), Icons = IconsV2 })
-	local Tab     = Window:AddTab({ Icon = "house" })      -- name (needs Icons), asset id, or GetIcon() result
-	local Sec     = Tab:AddSection("Main", "left")
-	Sec:AddButton({ Name = "Hello", Callback = function() end })
-]]
-
 local Library = {}
 Library.__index = Library
 
@@ -21,12 +8,14 @@ local Section = {}
 Section.__index = Section
 
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 
 local Theme = {
 	Main = Color3.fromRGB(24, 24, 28),
 	Sidebar = Color3.fromRGB(18, 18, 22),
 	Card = Color3.fromRGB(30, 30, 35),
 	Element = Color3.fromRGB(40, 40, 46),
+	Off = Color3.fromRGB(65, 65, 74),
 	IconOff = Color3.fromRGB(160, 160, 170),
 	IconOn = Color3.fromRGB(255, 255, 255),
 	Accent = Color3.fromRGB(50, 90, 220),
@@ -501,6 +490,328 @@ function Section:AddButton(config)
 	end)
 
 	return Btn
+end
+
+function Section:AddToggle(config)
+	config = config or {}
+	self._count += 1
+	local state = config.Default == true
+
+	local Row = Instance.new("TextButton")
+	Row.Name = "Toggle"
+	Row.Size = UDim2.new(1, 0, 0, 32)
+	Row.BackgroundColor3 = Theme.Element
+	Row.BorderSizePixel = 0
+	Row.Text = ""
+	Row.AutoButtonColor = false
+	Row.LayoutOrder = self._count
+	Row.Parent = self.Holder
+	corner(Row, 6)
+
+	local Label = Instance.new("TextLabel")
+	Label.Name = "Label"
+	Label.Position = UDim2.new(0, 8, 0, 0)
+	Label.Size = UDim2.new(1, -60, 1, 0)
+	Label.BackgroundTransparency = 1
+	Label.BorderSizePixel = 0
+	Label.Text = config.Name or "Toggle"
+	Label.TextColor3 = Theme.Text
+	Label.Font = Enum.Font.Gotham
+	Label.TextSize = 14
+	Label.TextXAlignment = Enum.TextXAlignment.Left
+	Label.TextTruncate = Enum.TextTruncate.AtEnd
+	Label.Parent = Row
+
+	local Track = Instance.new("Frame")
+	Track.Name = "Track"
+	Track.AnchorPoint = Vector2.new(1, 0.5)
+	Track.Position = UDim2.new(1, -8, 0.5, 0)
+	Track.Size = UDim2.new(0, 34, 0, 18)
+	Track.BackgroundColor3 = Theme.Off
+	Track.BorderSizePixel = 0
+	Track.Parent = Row
+	corner(Track, 9)
+
+	local Knob = Instance.new("Frame")
+	Knob.Name = "Knob"
+	Knob.AnchorPoint = Vector2.new(0, 0.5)
+	Knob.Position = UDim2.new(0, 2, 0.5, 0)
+	Knob.Size = UDim2.new(0, 14, 0, 14)
+	Knob.BackgroundColor3 = Theme.Text
+	Knob.BorderSizePixel = 0
+	Knob.Parent = Track
+	corner(Knob, 7)
+
+	local function render(animate)
+		local info = TweenInfo.new(animate and 0.15 or 0, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		TweenService:Create(Track, info, { BackgroundColor3 = state and Theme.Accent or Theme.Off }):Play()
+		TweenService:Create(Knob, info, {
+			Position = state and UDim2.new(1, -16, 0.5, 0) or UDim2.new(0, 2, 0.5, 0),
+		}):Play()
+	end
+	render(false)
+
+	local toggle = { Instance = Row }
+
+	function toggle:Set(value, silent)
+		state = value and true or false
+		render(true)
+		if not silent and config.Callback then config.Callback(state) end
+	end
+
+	function toggle:Get()
+		return state
+	end
+
+	Row.MouseButton1Click:Connect(function()
+		toggle:Set(not state)
+	end)
+
+	return toggle
+end
+
+function Section:AddDropdown(config)
+	config = config or {}
+	self._count += 1
+
+	local options = config.Options or {}
+	local multi = config.Multi == true
+	local MAX_LIST_HEIGHT = 130
+	local OPTION_HEIGHT, OPTION_GAP = 26, 4
+
+	local current = nil -- single mode
+	local selected = {} -- multi mode: [value] = true
+	local buttons = {} -- [value] = TextButton
+	local open = false
+
+	-- container grows downward when open, pushing the elements below it (nothing gets clipped)
+	local Container = Instance.new("Frame")
+	Container.Name = "Dropdown"
+	Container.Size = UDim2.new(1, 0, 0, 32)
+	Container.AutomaticSize = Enum.AutomaticSize.Y
+	Container.BackgroundTransparency = 1
+	Container.BorderSizePixel = 0
+	Container.LayoutOrder = self._count
+	Container.Parent = self.Holder
+
+	local ContainerLayout = Instance.new("UIListLayout")
+	ContainerLayout.Padding = UDim.new(0, 4)
+	ContainerLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	ContainerLayout.Parent = Container
+
+	local Header = Instance.new("TextButton")
+	Header.Name = "Header"
+	Header.Size = UDim2.new(1, 0, 0, 32)
+	Header.BackgroundColor3 = Theme.Element
+	Header.BorderSizePixel = 0
+	Header.Text = ""
+	Header.AutoButtonColor = false
+	Header.LayoutOrder = 1
+	Header.Parent = Container
+	corner(Header, 6)
+
+	local NameLabel = Instance.new("TextLabel")
+	NameLabel.Name = "Name"
+	NameLabel.Position = UDim2.new(0, 8, 0, 0)
+	NameLabel.Size = UDim2.new(0.5, -8, 1, 0)
+	NameLabel.BackgroundTransparency = 1
+	NameLabel.BorderSizePixel = 0
+	NameLabel.Text = config.Name or "Dropdown"
+	NameLabel.TextColor3 = Theme.Text
+	NameLabel.Font = Enum.Font.Gotham
+	NameLabel.TextSize = 14
+	NameLabel.TextXAlignment = Enum.TextXAlignment.Left
+	NameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+	NameLabel.Parent = Header
+
+	local ValueLabel = Instance.new("TextLabel")
+	ValueLabel.Name = "Value"
+	ValueLabel.Position = UDim2.new(0.5, 0, 0, 0)
+	ValueLabel.Size = UDim2.new(0.5, -28, 1, 0)
+	ValueLabel.BackgroundTransparency = 1
+	ValueLabel.BorderSizePixel = 0
+	ValueLabel.Text = "None"
+	ValueLabel.TextColor3 = Theme.SubText
+	ValueLabel.Font = Enum.Font.Gotham
+	ValueLabel.TextSize = 13
+	ValueLabel.TextXAlignment = Enum.TextXAlignment.Right
+	ValueLabel.TextTruncate = Enum.TextTruncate.AtEnd
+	ValueLabel.Parent = Header
+
+	local Arrow = Instance.new("TextLabel")
+	Arrow.Name = "Arrow"
+	Arrow.AnchorPoint = Vector2.new(1, 0.5)
+	Arrow.Position = UDim2.new(1, -8, 0.5, 0)
+	Arrow.Size = UDim2.new(0, 14, 0, 14)
+	Arrow.BackgroundTransparency = 1
+	Arrow.BorderSizePixel = 0
+	Arrow.Text = "▼"
+	Arrow.TextColor3 = Theme.SubText
+	Arrow.Font = Enum.Font.Gotham
+	Arrow.TextSize = 9
+	Arrow.Parent = Header
+
+	local List = Instance.new("ScrollingFrame")
+	List.Name = "List"
+	List.Size = UDim2.new(1, 0, 0, 0)
+	List.BackgroundColor3 = Theme.Sidebar
+	List.BorderSizePixel = 0
+	List.ScrollBarThickness = 3
+	List.ScrollBarImageColor3 = Theme.IconOff
+	List.ScrollingDirection = Enum.ScrollingDirection.Y
+	List.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	List.CanvasSize = UDim2.new(0, 0, 0, 0)
+	List.Visible = false
+	List.LayoutOrder = 2
+	List.Parent = Container
+	corner(List, 6)
+
+	-- vertical padding only (UIPadding on a ScrollingFrame doesn't affect scale widths)
+	local ListPad = Instance.new("UIPadding")
+	ListPad.PaddingTop = UDim.new(0, 4)
+	ListPad.PaddingBottom = UDim.new(0, 4)
+	ListPad.Parent = List
+
+	local ListLayout = Instance.new("UIListLayout")
+	ListLayout.Padding = UDim.new(0, OPTION_GAP)
+	ListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	ListLayout.Parent = List
+
+	local function isSelected(v)
+		if multi then return selected[v] == true end
+		return current == v
+	end
+
+	local function selectedList()
+		local out = {}
+		for _, o in ipairs(options) do
+			if selected[o] then table.insert(out, o) end
+		end
+		return out
+	end
+
+	local function refreshVisuals()
+		for v, b in pairs(buttons) do
+			local on = isSelected(v)
+			b.BackgroundColor3 = on and Theme.Accent or Theme.Element
+			b.TextColor3 = on and Theme.IconOn or Theme.SubText
+		end
+		if multi then
+			local names = {}
+			for _, o in ipairs(selectedList()) do table.insert(names, tostring(o)) end
+			ValueLabel.Text = #names > 0 and table.concat(names, ", ") or "None"
+		else
+			ValueLabel.Text = current ~= nil and tostring(current) or "None"
+		end
+	end
+
+	local function setOpen(state)
+		open = state
+		List.Visible = state
+		Arrow.Rotation = state and 180 or 0
+	end
+
+	local dropdown = { Instance = Container }
+
+	local function fire()
+		if config.Callback then
+			config.Callback(multi and selectedList() or current)
+		end
+	end
+
+	local function buildOptions()
+		for _, b in pairs(buttons) do b:Destroy() end
+		buttons = {}
+
+		for i, value in ipairs(options) do
+			local Opt = Instance.new("TextButton")
+			Opt.Name = "Option"
+			Opt.Size = UDim2.new(1, -8, 0, OPTION_HEIGHT)
+			Opt.BackgroundColor3 = Theme.Element
+			Opt.BorderSizePixel = 0
+			Opt.Text = tostring(value)
+			Opt.TextColor3 = Theme.SubText
+			Opt.Font = Enum.Font.Gotham
+			Opt.TextSize = 13
+			Opt.TextTruncate = Enum.TextTruncate.AtEnd
+			Opt.AutoButtonColor = true
+			Opt.LayoutOrder = i
+			Opt.Parent = List
+			corner(Opt, 5)
+
+			Opt.MouseButton1Click:Connect(function()
+				if multi then
+					selected[value] = not selected[value] or nil
+					refreshVisuals()
+					fire()
+				else
+					current = value
+					refreshVisuals()
+					setOpen(false)
+					fire()
+				end
+			end)
+
+			buttons[value] = Opt
+		end
+
+		local n = #options
+		local h = n > 0 and (n * OPTION_HEIGHT + (n - 1) * OPTION_GAP + 8) or 0
+		List.Size = UDim2.new(1, 0, 0, math.min(h, MAX_LIST_HEIGHT))
+		refreshVisuals()
+	end
+
+	-- Single mode: Set("Blue"). Multi mode: Set({"A", "B"}).
+	function dropdown:Set(value, silent)
+		if multi then
+			selected = {}
+			for _, v in ipairs(typeof(value) == "table" and value or { value }) do
+				selected[v] = true
+			end
+		else
+			current = value
+		end
+		refreshVisuals()
+		if not silent then fire() end
+	end
+
+	function dropdown:Get()
+		return multi and selectedList() or current
+	end
+
+	-- Replace the option list. Keeps selections that still exist when keepSelection is true.
+	function dropdown:Refresh(newOptions, keepSelection)
+		options = newOptions or {}
+		if keepSelection then
+			local stillThere = {}
+			for _, o in ipairs(options) do stillThere[o] = true end
+			if multi then
+				for v in pairs(selected) do
+					if not stillThere[v] then selected[v] = nil end
+				end
+			elseif not stillThere[current] then
+				current = nil
+			end
+		else
+			selected, current = {}, nil
+		end
+		buildOptions()
+	end
+
+	function dropdown:Open() setOpen(true) end
+	function dropdown:Close() setOpen(false) end
+
+	Header.MouseButton1Click:Connect(function()
+		setOpen(not open)
+	end)
+
+	buildOptions()
+	if config.Default ~= nil then
+		dropdown:Set(config.Default, true)
+	end
+
+	return dropdown
 end
 
 return Library
