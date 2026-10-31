@@ -168,521 +168,620 @@ local function v0_63(v1_64, v1_65)
 	v1_66.Parent = v1_64
 	return v1_66
 end
-function v0_1.new(v1_67)
-	v1_67 = v1_67 or {}
-	local v1_68 = setmetatable({}, v0_1)
-	v1_68.Tabs = {}
-	v1_68.ActiveTab = nil
-	v1_68.Icons = v1_67.Icons or v0_60()
-	v1_68.IconGlow = v1_67.IconGlow == true
-	v1_68._dialogs = {}
-	v1_68._binds = {}
-	v1_68._cleanups = {}
-	v1_68._listening = nil
-	v1_68._toggleKey = v1_67.ToggleKey
-	v1_68._connections = {}
-	local v1_69 = Instance.new("ScreenGui")
-	v1_69.Name = "Interface"
-	v1_69.ResetOnSpawn = false
-	v1_69.IgnoreGuiInset = true
-	v1_69.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-	v0_56(v1_69)
-	local v1_70 = v1_67.Size or UDim2.new(0, 600, 0, 400)
-	local v1_71 = Instance.new("CanvasGroup")
-	v1_71.Name = "Main"
-	v1_71.Size = v1_70
-	v1_71.AnchorPoint = Vector2.new(0.5, 0.5)
-	v1_71.Position = UDim2.new(0.5, 0, 0.5, 0)
-	v1_71.BackgroundColor3 = v0_8.Main
-	v1_71.BorderSizePixel = 0
-	v1_71.ClipsDescendants = true
-	v1_71.GroupTransparency = 1
-	v1_71.Parent = v1_69
-	v0_63(v1_71, v0_11)
-	local v1_72 = Instance.new("UIScale")
-	v1_72.Scale = 0.9
-	v1_72.Parent = v1_71
-	local function v1_73()
-		local v2_74 = v1_69.AbsoluteSize
-		if v2_74.X <= 0 or v2_74.Y <= 0 then
-			local v3_75 = workspace.CurrentCamera
-			v2_74 = v3_75 and v3_75.ViewportSize or Vector2.new(1280, 720)
-		end
-		local v2_76, v2_77 = v1_70.X.Offset, v1_70.Y.Offset
-		if v1_70.X.Scale == 0 then v2_76 = math.min(v2_76, math.max(v2_74.X - 20, 120)) end
-		if v1_70.Y.Scale == 0 then v2_77 = math.min(v2_77, math.max(v2_74.Y - 20, 120)) end
-		v1_71.Size = UDim2.new(v1_70.X.Scale, v2_76, v1_70.Y.Scale, v2_77)
-		v1_71.Position = UDim2.new(0.5, 0, 0.5, 0)
+local v0_67 = { translations = {}, code = nil, resolved = nil, dict = nil, windows = {} }
+local function v0_68(v1_69)
+	return (tostring(v1_69):lower():gsub("_", "-"))
+end
+local function v0_70()
+	local v1_71
+	pcall(function()
+		v1_71 = game:GetService("Players").LocalPlayer.LocaleId
+	end)
+	if type(v1_71) ~= "string" or v1_71 == "" then
+		pcall(function()
+			v1_71 = game:GetService("LocalizationService").RobloxLocaleId
+		end)
 	end
-	v1_73()
-	table.insert(v1_68._connections, v1_69:GetPropertyChangedSignal("AbsoluteSize"):Connect(v1_73))
+	if type(v1_71) ~= "string" or v1_71 == "" then
+		pcall(function()
+			v1_71 = game:GetService("LocalizationService").SystemLocaleId
+		end)
+	end
+	if type(v1_71) == "string" and v1_71 ~= "" then return v1_71 end
+	return "en-us"
+end
+local function v0_72(v1_73)
+	local v1_74 = v0_68(v1_73)
+	local v1_75 = v1_74:match("^[^-]+")
+	local v1_76 = {}
+	for v2_77 in pairs(v0_67.translations) do table.insert(v1_76, v2_77) end
+	table.sort(v1_76)
+	local v1_78
+	for v2_79, v2_80 in ipairs(v1_76) do
+		local v2_81 = v0_68(v2_80)
+		if v2_81 == v1_74 then return v2_80 end
+		if not v1_78 and v2_81:match("^[^-]+") == v1_75 then v1_78 = v2_80 end
+	end
+	return v1_78
+end
+local function v0_82(v1_83)
+	if type(v1_83) ~= "string" then return v1_83 end
+	local v1_84 = v0_67.dict
+	return v1_84 and v1_84[v1_83] or v1_83
+end
+function v0_1:T(v1_85)
+	return v0_82(v1_85)
+end
+function v0_1:_track(v1_86, v1_87, v1_88)
+	v1_86[v1_87] = v0_82(v1_88)
+	local v1_89 = { obj = v1_86, prop = v1_87, key = v1_88 }
+	table.insert(self._i18n, v1_89)
+	return v1_89
+end
+function v0_1:_onLang(v1_90, v1_91)
+	table.insert(self._i18n, { obj = v1_90, fn = v1_91 })
+end
+local function v0_92(v1_93)
+	local v1_94 = v1_93._i18n
+	for v2_95 = #v1_94, 1, -1 do
+		local v2_96 = v1_94[v2_95]
+		if not v2_96.obj:IsDescendantOf(v1_93.ScreenGui) then
+			table.remove(v1_94, v2_95)
+		elseif v2_96.fn then
+			pcall(v2_96.fn)
+		else
+			v2_96.obj[v2_96.prop] = v0_82(v2_96.key)
+		end
+	end
+end
+function v0_1:AddTranslations(v1_97)
+	for v2_98, v2_99 in pairs(v1_97 or {}) do
+		local v2_100 = v0_67.translations[v2_98]
+		if not v2_100 then
+			v2_100 = {}
+			v0_67.translations[v2_98] = v2_100
+		end
+		for v3_101, v3_102 in pairs(v2_99) do v2_100[v3_101] = v3_102 end
+	end
+	if v0_67.code then v0_1:SetLang(v0_67.code) end
+end
+function v0_1:SetLang(v1_103)
+	if v1_103 == nil or v1_103 == "auto" then v1_103 = v0_70() end
+	v0_67.code = v1_103
+	v0_67.resolved = v0_72(v1_103)
+	v0_67.dict = v0_67.resolved and v0_67.translations[v0_67.resolved] or nil
+	for v2_104 = #v0_67.windows, 1, -1 do
+		local v2_105 = v0_67.windows[v2_104]
+		if v2_105._destroyed then
+			table.remove(v0_67.windows, v2_104)
+		else
+			v0_92(v2_105)
+		end
+	end
+	return v0_67.resolved
+end
+function v0_1:GetLang()
+	return v0_67.resolved, v0_67.code
+end
+function v0_1.new(v1_106)
+	v1_106 = v1_106 or {}
+	local v1_107 = setmetatable({}, v0_1)
+	v1_107.Tabs = {}
+	v1_107.ActiveTab = nil
+	v1_107.Icons = v1_106.Icons or v0_60()
+	v1_107.IconGlow = v1_106.IconGlow == true
+	v1_107._i18n = {}
+	if v1_106.Translations then v0_1:AddTranslations(v1_106.Translations) end
+	if v1_106.Lang ~= nil then v0_1:SetLang(v1_106.Lang) end
+	table.insert(v0_67.windows, v1_107)
+	v1_107._dialogs = {}
+	v1_107._binds = {}
+	v1_107._cleanups = {}
+	v1_107._listening = nil
+	v1_107._toggleKey = v1_106.ToggleKey
+	v1_107._connections = {}
+	local v1_108 = Instance.new("ScreenGui")
+	v1_108.Name = "Interface"
+	v1_108.ResetOnSpawn = false
+	v1_108.IgnoreGuiInset = true
+	v1_108.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	v0_56(v1_108)
+	local v1_109 = v1_106.Size or UDim2.new(0, 600, 0, 400)
+	local v1_110 = Instance.new("CanvasGroup")
+	v1_110.Name = "Main"
+	v1_110.Size = v1_109
+	v1_110.AnchorPoint = Vector2.new(0.5, 0.5)
+	v1_110.Position = UDim2.new(0.5, 0, 0.5, 0)
+	v1_110.BackgroundColor3 = v0_8.Main
+	v1_110.BorderSizePixel = 0
+	v1_110.ClipsDescendants = true
+	v1_110.GroupTransparency = 1
+	v1_110.Parent = v1_108
+	v0_63(v1_110, v0_11)
+	local v1_111 = Instance.new("UIScale")
+	v1_111.Scale = 0.9
+	v1_111.Parent = v1_110
+	local function v1_112()
+		local v2_113 = v1_108.AbsoluteSize
+		if v2_113.X <= 0 or v2_113.Y <= 0 then
+			local v3_114 = workspace.CurrentCamera
+			v2_113 = v3_114 and v3_114.ViewportSize or Vector2.new(1280, 720)
+		end
+		local v2_115, v2_116 = v1_109.X.Offset, v1_109.Y.Offset
+		if v1_109.X.Scale == 0 then v2_115 = math.min(v2_115, math.max(v2_113.X - 20, 120)) end
+		if v1_109.Y.Scale == 0 then v2_116 = math.min(v2_116, math.max(v2_113.Y - 20, 120)) end
+		v1_110.Size = UDim2.new(v1_109.X.Scale, v2_115, v1_109.Y.Scale, v2_116)
+		v1_110.Position = UDim2.new(0.5, 0, 0.5, 0)
+	end
+	v1_112()
+	table.insert(v1_107._connections, v1_108:GetPropertyChangedSignal("AbsoluteSize"):Connect(v1_112))
 	do
-		local v2_78, v2_79, v2_80 = false, nil, nil
-		local v2_81 = 50
-		table.insert(v1_68._connections, v1_71.InputBegan:Connect(function(v3_82)
-			if v3_82.UserInputType == Enum.UserInputType.MouseButton1 or v3_82.UserInputType == Enum.UserInputType.Touch then
-				v2_78 = true
-				v2_79 = v3_82.Position
-				v2_80 = v1_71.AbsolutePosition + v1_71.AbsoluteSize / 2
-				v3_82.Changed:Connect(function()
-					if v3_82.UserInputState == Enum.UserInputState.End then v2_78 = false end
+		local v2_117, v2_118, v2_119 = false, nil, nil
+		local v2_120 = 50
+		table.insert(v1_107._connections, v1_110.InputBegan:Connect(function(v3_121)
+			if v3_121.UserInputType == Enum.UserInputType.MouseButton1 or v3_121.UserInputType == Enum.UserInputType.Touch then
+				v2_117 = true
+				v2_118 = v3_121.Position
+				v2_119 = v1_110.AbsolutePosition + v1_110.AbsoluteSize / 2
+				v3_121.Changed:Connect(function()
+					if v3_121.UserInputState == Enum.UserInputState.End then v2_117 = false end
 				end)
 			end
 		end))
-		table.insert(v1_68._connections, v0_4.InputChanged:Connect(function(v3_83)
-			if not v2_78 then return end
-			if v3_83.UserInputType ~= Enum.UserInputType.MouseMovement and v3_83.UserInputType ~= Enum.UserInputType.Touch then
+		table.insert(v1_107._connections, v0_4.InputChanged:Connect(function(v3_122)
+			if not v2_117 then return end
+			if v3_122.UserInputType ~= Enum.UserInputType.MouseMovement and v3_122.UserInputType ~= Enum.UserInputType.Touch then
 				return
 			end
-			local v3_84 = v3_83.Position - v2_79
-			local v3_85 = v1_69.AbsoluteSize
-			local v3_86 = v1_71.AbsoluteSize / 2
-			local v3_87 = math.clamp(v2_80.X + v3_84.X, -v3_86.X + v2_81, v3_85.X + v3_86.X - v2_81)
-			local v3_88 = math.clamp(v2_80.Y + v3_84.Y, v3_86.Y, math.max(v3_85.Y + v3_86.Y - v2_81, v3_86.Y))
-			v1_71.Position = UDim2.fromOffset(v3_87, v3_88)
+			local v3_123 = v3_122.Position - v2_118
+			local v3_124 = v1_108.AbsoluteSize
+			local v3_125 = v1_110.AbsoluteSize / 2
+			local v3_126 = math.clamp(v2_119.X + v3_123.X, -v3_125.X + v2_120, v3_124.X + v3_125.X - v2_120)
+			local v3_127 = math.clamp(v2_119.Y + v3_123.Y, v3_125.Y, math.max(v3_124.Y + v3_125.Y - v2_120, v3_125.Y))
+			v1_110.Position = UDim2.fromOffset(v3_126, v3_127)
 		end))
 	end
-	local v1_89 = Instance.new("Frame")
-	v1_89.Name = "Sidebar"
-	v1_89.Size = UDim2.new(0, v0_9, 1, 0)
-	v1_89.BackgroundColor3 = v0_8.Sidebar
-	v1_89.BorderSizePixel = 0
-	v1_89.Parent = v1_71
-	v0_63(v1_89, v0_11)
-	local v1_90 = Instance.new("Frame")
-	v1_90.Name = "SidebarFix"
-	v1_90.Size = UDim2.new(0, v0_11, 1, 0)
-	v1_90.Position = UDim2.new(0, v0_9 - v0_11, 0, 0)
-	v1_90.BackgroundColor3 = v0_8.Sidebar
-	v1_90.BorderSizePixel = 0
-	v1_90.Parent = v1_71
-	local v1_91 = Instance.new("UIPadding")
-	v1_91.PaddingTop = UDim.new(0, 12)
-	v1_91.Parent = v1_89
-	local v1_92 = Instance.new("UIListLayout")
-	v1_92.Padding = UDim.new(0, 8)
-	v1_92.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	v1_92.SortOrder = Enum.SortOrder.LayoutOrder
-	v1_92.Parent = v1_89
-	local v1_93 = v1_67.Footer ~= false and v0_10 or 0
-	local v1_94 = Instance.new("Frame")
-	v1_94.Name = "Content"
-	v1_94.Size = UDim2.new(1, -v0_9, 1, -v1_93)
-	v1_94.Position = UDim2.new(0, v0_9, 0, 0)
-	v1_94.BackgroundTransparency = 1
-	v1_94.BorderSizePixel = 0
-	v1_94.ClipsDescendants = true
-	v1_94.Parent = v1_71
+	local v1_128 = Instance.new("Frame")
+	v1_128.Name = "Sidebar"
+	v1_128.Size = UDim2.new(0, v0_9, 1, 0)
+	v1_128.BackgroundColor3 = v0_8.Sidebar
+	v1_128.BorderSizePixel = 0
+	v1_128.Parent = v1_110
+	v0_63(v1_128, v0_11)
+	local v1_129 = Instance.new("Frame")
+	v1_129.Name = "SidebarFix"
+	v1_129.Size = UDim2.new(0, v0_11, 1, 0)
+	v1_129.Position = UDim2.new(0, v0_9 - v0_11, 0, 0)
+	v1_129.BackgroundColor3 = v0_8.Sidebar
+	v1_129.BorderSizePixel = 0
+	v1_129.Parent = v1_110
+	local v1_130 = Instance.new("UIPadding")
+	v1_130.PaddingTop = UDim.new(0, 12)
+	v1_130.Parent = v1_128
+	local v1_131 = Instance.new("UIListLayout")
+	v1_131.Padding = UDim.new(0, 8)
+	v1_131.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	v1_131.SortOrder = Enum.SortOrder.LayoutOrder
+	v1_131.Parent = v1_128
+	local v1_132 = v1_106.Footer ~= false and v0_10 or 0
+	local v1_133 = Instance.new("Frame")
+	v1_133.Name = "Content"
+	v1_133.Size = UDim2.new(1, -v0_9, 1, -v1_132)
+	v1_133.Position = UDim2.new(0, v0_9, 0, 0)
+	v1_133.BackgroundTransparency = 1
+	v1_133.BorderSizePixel = 0
+	v1_133.ClipsDescendants = true
+	v1_133.Parent = v1_110
 	do
-		local v2_95 = Instance.new("CanvasGroup")
-		v2_95.Name = "ScrollHint"
-		v2_95.AnchorPoint = Vector2.new(0.5, 1)
-		v2_95.Position = UDim2.new(0.5, -1, 1, -6)
-		v2_95.Size = UDim2.new(0, 22, 0, 22)
-		v2_95.BackgroundTransparency = 1
-		v2_95.BorderSizePixel = 0
-		v2_95.GroupTransparency = 1
-		v2_95.Visible = false
-		v2_95.Active = false
-		v2_95.ZIndex = 10
-		v2_95.Parent = v1_94
-		local v2_96 = Instance.new("ImageLabel")
-		v2_96.Name = "Icon"
-		v2_96.AnchorPoint = Vector2.new(0.5, 0.5)
-		v2_96.Position = UDim2.new(0.5, 0, 0.5, -3)
-		v2_96.Size = UDim2.new(0, 16, 0, 16)
-		v2_96.BackgroundTransparency = 1
-		v2_96.BorderSizePixel = 0
-		v2_96.ImageColor3 = v0_8.SubText
-		v2_96.ScaleType = Enum.ScaleType.Fit
-		v2_96.Active = false
-		v2_96.Parent = v2_95
-		local v2_97 = Instance.new("TextLabel")
-		v2_97.Name = "IconFallback"
-		v2_97.Size = UDim2.new(1, 0, 1, 0)
-		v2_97.BackgroundTransparency = 1
-		v2_97.Text = "▼"
-		v2_97.TextColor3 = v0_8.SubText
-		v2_97.Font = Enum.Font.Gotham
-		v2_97.TextSize = 11
-		v2_97.Parent = v2_96
-		v2_97.Visible = not v0_44(v2_96, "chevron-down", v1_68.Icons)
-		local v2_98 = v0_5:Create(
-			v2_96,
+		local v2_134 = Instance.new("CanvasGroup")
+		v2_134.Name = "ScrollHint"
+		v2_134.AnchorPoint = Vector2.new(0.5, 1)
+		v2_134.Position = UDim2.new(0.5, -1, 1, -6)
+		v2_134.Size = UDim2.new(0, 22, 0, 22)
+		v2_134.BackgroundTransparency = 1
+		v2_134.BorderSizePixel = 0
+		v2_134.GroupTransparency = 1
+		v2_134.Visible = false
+		v2_134.Active = false
+		v2_134.ZIndex = 10
+		v2_134.Parent = v1_133
+		local v2_135 = Instance.new("ImageLabel")
+		v2_135.Name = "Icon"
+		v2_135.AnchorPoint = Vector2.new(0.5, 0.5)
+		v2_135.Position = UDim2.new(0.5, 0, 0.5, -3)
+		v2_135.Size = UDim2.new(0, 16, 0, 16)
+		v2_135.BackgroundTransparency = 1
+		v2_135.BorderSizePixel = 0
+		v2_135.ImageColor3 = v0_8.SubText
+		v2_135.ScaleType = Enum.ScaleType.Fit
+		v2_135.Active = false
+		v2_135.Parent = v2_134
+		local v2_136 = Instance.new("TextLabel")
+		v2_136.Name = "IconFallback"
+		v2_136.Size = UDim2.new(1, 0, 1, 0)
+		v2_136.BackgroundTransparency = 1
+		v2_136.Text = "▼"
+		v2_136.TextColor3 = v0_8.SubText
+		v2_136.Font = Enum.Font.Gotham
+		v2_136.TextSize = 11
+		v2_136.Parent = v2_135
+		v2_136.Visible = not v0_44(v2_135, "chevron-down", v1_107.Icons)
+		local v2_137 = v0_5:Create(
+			v2_135,
 			TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
 			{ Position = UDim2.new(0.5, 0, 0.5, 3) }
 		)
-		local v2_99 = Instance.new("TextButton")
-		v2_99.Name = "Click"
-		v2_99.Size = UDim2.new(1, 0, 1, 0)
-		v2_99.BackgroundTransparency = 1
-		v2_99.BorderSizePixel = 0
-		v2_99.Text = ""
-		v2_99.AutoButtonColor = false
-		v2_99.ZIndex = 2
-		v2_99.Parent = v2_95
-		local v2_100 = UDim2.new(0.5, -1, 1, -34)
-		local v2_101 = UDim2.new(0.5, -1, 1, -27)
-		local v2_102 = Instance.new("CanvasGroup")
-		v2_102.Name = "ScrollHintText"
-		v2_102.AnchorPoint = Vector2.new(0.5, 1)
-		v2_102.Position = v2_101
-		v2_102.Size = UDim2.new(0, 0, 0, 0)
-		v2_102.AutomaticSize = Enum.AutomaticSize.XY
-		v2_102.BackgroundColor3 = v0_8.Sidebar
-		v2_102.BorderSizePixel = 0
-		v2_102.GroupTransparency = 1
-		v2_102.Visible = false
-		v2_102.Active = false
-		v2_102.ZIndex = 10
-		v2_102.Parent = v1_94
-		v0_63(v2_102, 6)
-		local v2_103 = Instance.new("UIStroke")
-		v2_103.Color = v0_8.Element
-		v2_103.Thickness = 1
-		v2_103.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-		v2_103.Parent = v2_102
-		local v2_104 = Instance.new("UIPadding")
-		v2_104.PaddingTop = UDim.new(0, 6)
-		v2_104.PaddingBottom = UDim.new(0, 6)
-		v2_104.PaddingLeft = UDim.new(0, 10)
-		v2_104.PaddingRight = UDim.new(0, 10)
-		v2_104.Parent = v2_102
-		local v2_105 = Instance.new("TextLabel")
-		v2_105.Name = "Text"
-		v2_105.Size = UDim2.new(0, 0, 0, 0)
-		v2_105.AutomaticSize = Enum.AutomaticSize.XY
-		v2_105.BackgroundTransparency = 1
-		v2_105.BorderSizePixel = 0
-		v2_105.Text = "Scroll To See More Features."
-		v2_105.TextColor3 = v0_8.Text
-		v2_105.Font = Enum.Font.Gotham
-		v2_105.TextSize = 12
-		v2_105.Parent = v2_102
-		local v2_106, v2_107, v2_108 = false, nil, nil
-		local function v2_109(v3_110)
-			if v2_107 and v2_107 ~= coroutine.running() then
-				pcall(task.cancel, v2_107)
+		local v2_138 = Instance.new("TextButton")
+		v2_138.Name = "Click"
+		v2_138.Size = UDim2.new(1, 0, 1, 0)
+		v2_138.BackgroundTransparency = 1
+		v2_138.BorderSizePixel = 0
+		v2_138.Text = ""
+		v2_138.AutoButtonColor = false
+		v2_138.ZIndex = 2
+		v2_138.Parent = v2_134
+		local v2_139 = UDim2.new(0.5, -1, 1, -34)
+		local v2_140 = UDim2.new(0.5, -1, 1, -27)
+		local v2_141 = Instance.new("CanvasGroup")
+		v2_141.Name = "ScrollHintText"
+		v2_141.AnchorPoint = Vector2.new(0.5, 1)
+		v2_141.Position = v2_140
+		v2_141.Size = UDim2.new(0, 0, 0, 0)
+		v2_141.AutomaticSize = Enum.AutomaticSize.XY
+		v2_141.BackgroundColor3 = v0_8.Sidebar
+		v2_141.BorderSizePixel = 0
+		v2_141.GroupTransparency = 1
+		v2_141.Visible = false
+		v2_141.Active = false
+		v2_141.ZIndex = 10
+		v2_141.Parent = v1_133
+		v0_63(v2_141, 6)
+		local v2_142 = Instance.new("UIStroke")
+		v2_142.Color = v0_8.Element
+		v2_142.Thickness = 1
+		v2_142.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		v2_142.Parent = v2_141
+		local v2_143 = Instance.new("UIPadding")
+		v2_143.PaddingTop = UDim.new(0, 6)
+		v2_143.PaddingBottom = UDim.new(0, 6)
+		v2_143.PaddingLeft = UDim.new(0, 10)
+		v2_143.PaddingRight = UDim.new(0, 10)
+		v2_143.Parent = v2_141
+		local v2_144 = Instance.new("TextLabel")
+		v2_144.Name = "Text"
+		v2_144.Size = UDim2.new(0, 0, 0, 0)
+		v2_144.AutomaticSize = Enum.AutomaticSize.XY
+		v2_144.BackgroundTransparency = 1
+		v2_144.BorderSizePixel = 0
+		v1_107:_track(v2_144, "Text", "Scroll To See More Features.")
+		v2_144.TextColor3 = v0_8.Text
+		v2_144.Font = Enum.Font.Gotham
+		v2_144.TextSize = 12
+		v2_144.Parent = v2_141
+		local v2_145, v2_146, v2_147 = false, nil, nil
+		local function v2_148(v3_149)
+			if v2_146 and v2_146 ~= coroutine.running() then
+				pcall(task.cancel, v2_146)
 			end
-			v2_107 = nil
-			if not v2_106 then return end
-			v2_106 = false
-			if v2_108 then v2_108:Cancel() end
-			if v3_110 then
-				v2_102.GroupTransparency = 1
-				v2_102.Visible = false
+			v2_146 = nil
+			if not v2_145 then return end
+			v2_145 = false
+			if v2_147 then v2_147:Cancel() end
+			if v3_149 then
+				v2_141.GroupTransparency = 1
+				v2_141.Visible = false
 				return
 			end
-			local v3_111 = v0_12(v2_102, { GroupTransparency = 1, Position = v2_101 }, 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-			v2_108 = v3_111
-			v3_111.Completed:Connect(function(v4_112)
-				if v4_112 == Enum.PlaybackState.Completed and not v2_106 then
-					v2_102.Visible = false
+			local v3_150 = v0_12(v2_141, { GroupTransparency = 1, Position = v2_140 }, 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			v2_147 = v3_150
+			v3_150.Completed:Connect(function(v4_151)
+				if v4_151 == Enum.PlaybackState.Completed and not v2_145 then
+					v2_141.Visible = false
 				end
 			end)
 		end
-		local function v2_113()
-			if v2_106 then return end
-			v2_106 = true
-			if v2_108 then v2_108:Cancel() end
-			if not v2_102.Visible then
-				v2_102.Position = v2_101
-				v2_102.Visible = true
+		local function v2_152()
+			if v2_145 then return end
+			v2_145 = true
+			if v2_147 then v2_147:Cancel() end
+			if not v2_141.Visible then
+				v2_141.Position = v2_140
+				v2_141.Visible = true
 			end
-			v2_108 = v0_12(v2_102, { GroupTransparency = 0, Position = v2_100 }, 0.25, Enum.EasingStyle.Quint)
-			v2_107 = task.spawn(function()
+			v2_147 = v0_12(v2_141, { GroupTransparency = 0, Position = v2_139 }, 0.25, Enum.EasingStyle.Quint)
+			v2_146 = task.spawn(function()
 				task.wait(3.5)
-				v2_107 = nil
-				v2_109()
+				v2_146 = nil
+				v2_148()
 			end)
 		end
-		v2_99.MouseButton1Click:Connect(function()
-			if v2_106 then v2_109() else v2_113() end
+		v2_138.MouseButton1Click:Connect(function()
+			if v2_145 then v2_148() else v2_152() end
 		end)
-		v1_68._hint = { Frame = v2_95, Icon = v2_96, Bounce = v2_98, Shown = false, HideTip = v2_109 }
+		v1_107._hint = { Frame = v2_134, Icon = v2_135, Bounce = v2_137, Shown = false, HideTip = v2_148 }
 	end
-	if v1_93 > 0 then
-		local v2_114 = Instance.new("Frame")
-		v2_114.Name = "Footer"
-		v2_114.AnchorPoint = Vector2.new(0, 1)
-		v2_114.Position = UDim2.new(0, 0, 1, 0)
-		v2_114.Size = UDim2.new(1, 0, 0, v1_93)
-		v2_114.BackgroundColor3 = v0_8.Sidebar
-		v2_114.BorderSizePixel = 0
-		v2_114.Parent = v1_71
-		local v2_115 = Instance.new("Frame")
-		v2_115.Name = "Divider"
-		v2_115.Size = UDim2.new(1, 0, 0, 1)
-		v2_115.BackgroundColor3 = v0_8.Element
-		v2_115.BorderSizePixel = 0
-		v2_115.Parent = v2_114
-		local function v2_116(v3_117, v3_118, v3_119, v3_120, v3_121)
-			local v3_122 = Instance.new("TextLabel")
-			v3_122.Name = v3_117
-			v3_122.AnchorPoint = v3_121
-			v3_122.Position = v3_119
-			v3_122.Size = v3_120
-			v3_122.BackgroundTransparency = 1
-			v3_122.BorderSizePixel = 0
-			v3_122.Text = ""
-			v3_122.TextColor3 = v0_8.SubText
-			v3_122.Font = Enum.Font.Gotham
-			v3_122.TextSize = 12
-			v3_122.TextXAlignment = v3_118
-			v3_122.TextTruncate = Enum.TextTruncate.AtEnd
-			v3_122.Parent = v2_114
-			return v3_122
+	if v1_132 > 0 then
+		local v2_153 = Instance.new("Frame")
+		v2_153.Name = "Footer"
+		v2_153.AnchorPoint = Vector2.new(0, 1)
+		v2_153.Position = UDim2.new(0, 0, 1, 0)
+		v2_153.Size = UDim2.new(1, 0, 0, v1_132)
+		v2_153.BackgroundColor3 = v0_8.Sidebar
+		v2_153.BorderSizePixel = 0
+		v2_153.Parent = v1_110
+		local v2_154 = Instance.new("Frame")
+		v2_154.Name = "Divider"
+		v2_154.Size = UDim2.new(1, 0, 0, 1)
+		v2_154.BackgroundColor3 = v0_8.Element
+		v2_154.BorderSizePixel = 0
+		v2_154.Parent = v2_153
+		local function v2_155(v3_156, v3_157, v3_158, v3_159, v3_160)
+			local v3_161 = Instance.new("TextLabel")
+			v3_161.Name = v3_156
+			v3_161.AnchorPoint = v3_160
+			v3_161.Position = v3_158
+			v3_161.Size = v3_159
+			v3_161.BackgroundTransparency = 1
+			v3_161.BorderSizePixel = 0
+			v3_161.Text = ""
+			v3_161.TextColor3 = v0_8.SubText
+			v3_161.Font = Enum.Font.Gotham
+			v3_161.TextSize = 12
+			v3_161.TextXAlignment = v3_157
+			v3_161.TextTruncate = Enum.TextTruncate.AtEnd
+			v3_161.Parent = v2_153
+			return v3_161
 		end
-		local v2_123 = v2_116("Time", Enum.TextXAlignment.Left, UDim2.new(0, 12, 0, 0), UDim2.new(0, 100, 1, 0), Vector2.new(0, 0))
-		local v2_124 = v2_116("Game", Enum.TextXAlignment.Center, UDim2.new(0, 112, 0, 0), UDim2.new(1, -224, 1, 0), Vector2.new(0, 0))
-		local v2_125 = v2_116("Executor", Enum.TextXAlignment.Right, UDim2.new(1, -12, 0, 0), UDim2.new(0, 100, 1, 0), Vector2.new(1, 0))
-		if type(v1_67.FooterLeft) == "string" then
-			v2_123.Text = v1_67.FooterLeft
+		local v2_162 = v2_155("Time", Enum.TextXAlignment.Left, UDim2.new(0, 12, 0, 0), UDim2.new(0, 100, 1, 0), Vector2.new(0, 0))
+		local v2_163 = v2_155("Game", Enum.TextXAlignment.Center, UDim2.new(0, 112, 0, 0), UDim2.new(1, -224, 1, 0), Vector2.new(0, 0))
+		local v2_164 = v2_155("Executor", Enum.TextXAlignment.Right, UDim2.new(1, -12, 0, 0), UDim2.new(0, 100, 1, 0), Vector2.new(1, 0))
+		if type(v1_106.FooterLeft) == "string" then
+			v2_162.Text = v1_106.FooterLeft
 		else
-			local function v3_126()
-				local v4_127 = os.date("%I:%M %p")
-				if v2_123.Text ~= v4_127 then v2_123.Text = v4_127 end
+			local function v3_165()
+				local v4_166 = os.date("%I:%M %p")
+				if v2_162.Text ~= v4_166 then v2_162.Text = v4_166 end
 			end
-			v3_126()
-			v1_68._clock = task.spawn(function()
-				while not v1_68._destroyed do
+			v3_165()
+			v1_107._clock = task.spawn(function()
+				while not v1_107._destroyed do
 					task.wait(60 - (os.time() % 60) + 0.1)
-					v3_126()
+					v3_165()
 				end
 			end)
 		end
-		if type(v1_67.FooterCenter) == "string" then
-			v2_124.Text = v1_67.FooterCenter
+		if type(v1_106.FooterCenter) == "string" then
+			v2_163.Text = v1_106.FooterCenter
 		else
-			v2_124.Text = "Loading..."
+			v2_163.Text = v0_82("Loading...")
 			task.spawn(function()
-				local v4_128, v4_129 = pcall(function()
+				local v4_167, v4_168 = pcall(function()
 					return v0_7:GetProductInfo(game.PlaceId)
 				end)
-				if v1_68._destroyed then return end
-				v2_124.Text = (v4_128 and v4_129 and v4_129.Name) or tostring(game.Name)
+				if v1_107._destroyed then return end
+				v2_163.Text = (v4_167 and v4_168 and v4_168.Name) or tostring(game.Name)
 			end)
 		end
-		if type(v1_67.FooterRight) == "string" then
-			v2_125.Text = v1_67.FooterRight
+		if type(v1_106.FooterRight) == "string" then
+			v2_164.Text = v1_106.FooterRight
 		else
-			local v3_130
+			local v3_169
 			if type(identifyexecutor) == "function" then
-				local v4_131, v4_132 = pcall(identifyexecutor)
-				if v4_131 and v4_132 then v3_130 = tostring(v4_132) end
+				local v4_170, v4_171 = pcall(identifyexecutor)
+				if v4_170 and v4_171 then v3_169 = tostring(v4_171) end
 			end
-			v2_125.Text = v3_130 or "Roblox"
+			v2_164.Text = v3_169 or "Roblox"
 		end
 	end
-	if v1_67.Resizable ~= false then
-		local v2_133 = v1_67.MinSize or Vector2.new(380, 260)
-		local v2_134 = v1_67.MaxSize
-		local v2_135 = Instance.new("TextButton")
-		v2_135.Name = "ResizeGrip"
-		v2_135.AnchorPoint = Vector2.new(1, 1)
-		v2_135.Position = UDim2.new(1, -6, 1, -6 - v1_93)
-		v2_135.Size = UDim2.new(0, 22, 0, 22)
-		v2_135.BackgroundColor3 = v0_8.Main
-		v2_135.BackgroundTransparency = 0.25
-		v2_135.BorderSizePixel = 0
-		v2_135.Text = ""
-		v2_135.AutoButtonColor = false
-		v2_135.Parent = v1_71
-		v0_63(v2_135, 6)
-		local v2_136 = Instance.new("ImageLabel")
-		v2_136.Name = "Icon"
-		v2_136.AnchorPoint = Vector2.new(0.5, 0.5)
-		v2_136.Position = UDim2.new(0.5, 0, 0.5, 0)
-		v2_136.Size = UDim2.new(0, 14, 0, 14)
-		v2_136.BackgroundTransparency = 1
-		v2_136.BorderSizePixel = 0
-		v2_136.ImageColor3 = v0_8.IconOff
-		v2_136.ScaleType = Enum.ScaleType.Fit
-		v2_136.Parent = v2_135
-		local v2_137 = Instance.new("TextLabel")
-		v2_137.Name = "IconFallback"
-		v2_137.Size = UDim2.new(1, 0, 1, 0)
-		v2_137.BackgroundTransparency = 1
-		v2_137.Text = "⤢"
-		v2_137.TextColor3 = v0_8.IconOff
-		v2_137.Font = Enum.Font.GothamBold
-		v2_137.TextSize = 14
-		v2_137.Parent = v2_136
-		v2_137.Visible = not v0_44(v2_136, "expand", v1_68.Icons)
-		local v2_138 = Instance.new("UIScale")
-		v2_138.Parent = v2_135
-		local v2_139, v2_140, v2_141 = false, false, nil
-		local function v2_142()
-			local v3_143 = v2_139 or v2_140
-			local v3_144 = v3_143 and v0_8.IconOn or v0_8.IconOff
-			v0_12(v2_136, { ImageColor3 = v3_144 }, 0.15)
-			v0_12(v2_137, { TextColor3 = v3_144 }, 0.15)
-			v0_12(v2_135, { BackgroundColor3 = v3_143 and v0_8.Hover or v0_8.Main }, 0.15)
+	if v1_106.Resizable ~= false then
+		local v2_172 = v1_106.MinSize or Vector2.new(380, 260)
+		local v2_173 = v1_106.MaxSize
+		local v2_174 = Instance.new("TextButton")
+		v2_174.Name = "ResizeGrip"
+		v2_174.AnchorPoint = Vector2.new(1, 1)
+		v2_174.Position = UDim2.new(1, -6, 1, -6 - v1_132)
+		v2_174.Size = UDim2.new(0, 22, 0, 22)
+		v2_174.BackgroundColor3 = v0_8.Main
+		v2_174.BackgroundTransparency = 0.25
+		v2_174.BorderSizePixel = 0
+		v2_174.Text = ""
+		v2_174.AutoButtonColor = false
+		v2_174.Parent = v1_110
+		v0_63(v2_174, 6)
+		local v2_175 = Instance.new("ImageLabel")
+		v2_175.Name = "Icon"
+		v2_175.AnchorPoint = Vector2.new(0.5, 0.5)
+		v2_175.Position = UDim2.new(0.5, 0, 0.5, 0)
+		v2_175.Size = UDim2.new(0, 14, 0, 14)
+		v2_175.BackgroundTransparency = 1
+		v2_175.BorderSizePixel = 0
+		v2_175.ImageColor3 = v0_8.IconOff
+		v2_175.ScaleType = Enum.ScaleType.Fit
+		v2_175.Parent = v2_174
+		local v2_176 = Instance.new("TextLabel")
+		v2_176.Name = "IconFallback"
+		v2_176.Size = UDim2.new(1, 0, 1, 0)
+		v2_176.BackgroundTransparency = 1
+		v2_176.Text = "⤢"
+		v2_176.TextColor3 = v0_8.IconOff
+		v2_176.Font = Enum.Font.GothamBold
+		v2_176.TextSize = 14
+		v2_176.Parent = v2_175
+		v2_176.Visible = not v0_44(v2_175, "expand", v1_107.Icons)
+		local v2_177 = Instance.new("UIScale")
+		v2_177.Parent = v2_174
+		local v2_178, v2_179, v2_180 = false, false, nil
+		local function v2_181()
+			local v3_182 = v2_178 or v2_179
+			local v3_183 = v3_182 and v0_8.IconOn or v0_8.IconOff
+			v0_12(v2_175, { ImageColor3 = v3_183 }, 0.15)
+			v0_12(v2_176, { TextColor3 = v3_183 }, 0.15)
+			v0_12(v2_174, { BackgroundColor3 = v3_182 and v0_8.Hover or v0_8.Main }, 0.15)
 		end
-		local function v2_145()
-			if v2_141 then
-				for v5_146, v5_147 in ipairs(v2_141) do v5_147:Disconnect() end
-				v2_141 = nil
+		local function v2_184()
+			if v2_180 then
+				for v5_185, v5_186 in ipairs(v2_180) do v5_186:Disconnect() end
+				v2_180 = nil
 			end
-			if v2_140 then
-				v2_140 = false
-				v2_142()
-				v0_12(v2_138, { Scale = v2_139 and 1.1 or 1 }, 0.18, Enum.EasingStyle.Back)
+			if v2_179 then
+				v2_179 = false
+				v2_181()
+				v0_12(v2_177, { Scale = v2_178 and 1.1 or 1 }, 0.18, Enum.EasingStyle.Back)
 			end
 		end
-		local function v2_148(v3_149)
-			v2_145()
-			v2_140 = true
-			v2_142()
-			v0_12(v2_138, { Scale = 0.9 }, 0.08)
-			local v3_150 = v1_72.Scale
-			local v3_151 = v3_149.Position
-			local v3_152 = v1_71.AbsoluteSize / v3_150
-			local v3_153 = v1_71.AbsolutePosition
-			v2_141 = {
-				v0_4.InputChanged:Connect(function(v4_154)
-					if v4_154.UserInputType ~= Enum.UserInputType.MouseMovement and v4_154 ~= v3_149 then return end
-					local v4_155 = v4_154.Position - v3_151
-					local v4_156 = v1_69.AbsoluteSize
-					local v4_157 = math.max(v2_133.X, v4_156.X - v3_153.X - 4)
-					local v4_158 = math.max(v2_133.Y, v4_156.Y - v3_153.Y - 4)
-					if v2_134 then
-						v4_157 = math.max(v2_133.X, math.min(v4_157, v2_134.X))
-						v4_158 = math.max(v2_133.Y, math.min(v4_158, v2_134.Y))
+		local function v2_187(v3_188)
+			v2_184()
+			v2_179 = true
+			v2_181()
+			v0_12(v2_177, { Scale = 0.9 }, 0.08)
+			local v3_189 = v1_111.Scale
+			local v3_190 = v3_188.Position
+			local v3_191 = v1_110.AbsoluteSize / v3_189
+			local v3_192 = v1_110.AbsolutePosition
+			v2_180 = {
+				v0_4.InputChanged:Connect(function(v4_193)
+					if v4_193.UserInputType ~= Enum.UserInputType.MouseMovement and v4_193 ~= v3_188 then return end
+					local v4_194 = v4_193.Position - v3_190
+					local v4_195 = v1_108.AbsoluteSize
+					local v4_196 = math.max(v2_172.X, v4_195.X - v3_192.X - 4)
+					local v4_197 = math.max(v2_172.Y, v4_195.Y - v3_192.Y - 4)
+					if v2_173 then
+						v4_196 = math.max(v2_172.X, math.min(v4_196, v2_173.X))
+						v4_197 = math.max(v2_172.Y, math.min(v4_197, v2_173.Y))
 					end
-					local v4_159 = math.clamp(v3_152.X + v4_155.X / v3_150, v2_133.X, v4_157)
-					local v4_160 = math.clamp(v3_152.Y + v4_155.Y / v3_150, v2_133.Y, v4_158)
-					v1_70 = UDim2.fromOffset(v4_159, v4_160)
-					v1_71.Size = v1_70
-					v1_71.Position = UDim2.fromOffset(v3_153.X + v4_159 * v3_150 / 2, v3_153.Y + v4_160 * v3_150 / 2)
+					local v4_198 = math.clamp(v3_191.X + v4_194.X / v3_189, v2_172.X, v4_196)
+					local v4_199 = math.clamp(v3_191.Y + v4_194.Y / v3_189, v2_172.Y, v4_197)
+					v1_109 = UDim2.fromOffset(v4_198, v4_199)
+					v1_110.Size = v1_109
+					v1_110.Position = UDim2.fromOffset(v3_192.X + v4_198 * v3_189 / 2, v3_192.Y + v4_199 * v3_189 / 2)
 				end),
-				v0_4.InputEnded:Connect(function(v4_161)
-					if v4_161 == v3_149 or v4_161.UserInputType == Enum.UserInputType.MouseButton1 then
-						v2_145()
+				v0_4.InputEnded:Connect(function(v4_200)
+					if v4_200 == v3_188 or v4_200.UserInputType == Enum.UserInputType.MouseButton1 then
+						v2_184()
 					end
 				end),
 			}
 		end
-		v2_135.InputBegan:Connect(function(v3_162)
-			if v0_19(v3_162) then v2_148(v3_162) end
+		v2_174.InputBegan:Connect(function(v3_201)
+			if v0_19(v3_201) then v2_187(v3_201) end
 		end)
-		v2_135.MouseEnter:Connect(function()
-			v2_139 = true
-			v2_142()
-			if not v2_140 then v0_12(v2_138, { Scale = 1.1 }, 0.12) end
+		v2_174.MouseEnter:Connect(function()
+			v2_178 = true
+			v2_181()
+			if not v2_179 then v0_12(v2_177, { Scale = 1.1 }, 0.12) end
 		end)
-		v2_135.MouseLeave:Connect(function()
-			v2_139 = false
-			v2_142()
-			if not v2_140 then v0_12(v2_138, { Scale = 1 }, 0.12) end
+		v2_174.MouseLeave:Connect(function()
+			v2_178 = false
+			v2_181()
+			if not v2_179 then v0_12(v2_177, { Scale = 1 }, 0.12) end
 		end)
-		v1_68._cleanups[v2_135] = v2_145
+		v1_107._cleanups[v2_174] = v2_184
 	end
-	v1_68.ScreenGui, v1_68.Main, v1_68.Sidebar, v1_68.Content = v1_69, v1_71, v1_89, v1_94
-	if v1_67.Icon ~= nil then
-		v1_68:SetIcon(v1_67.Icon, v1_67.IconColor)
+	v1_107.ScreenGui, v1_107.Main, v1_107.Sidebar, v1_107.Content = v1_108, v1_110, v1_128, v1_133
+	if v1_106.Icon ~= nil then
+		v1_107:SetIcon(v1_106.Icon, v1_106.IconColor)
 	end
-	v1_68._scale = v1_72
-	v1_68._visible = false
-	if v1_67.Watermark ~= false then
-		v1_68:_buildWatermark(v1_67.Title or v1_67.Name or "RobloxUI")
+	v1_107._scale = v1_111
+	v1_107._visible = false
+	if v1_106.Watermark ~= false then
+		v1_107:_buildWatermark(v1_106.Title or v1_106.Name or "RobloxUI")
 	end
-	table.insert(v1_68._connections, v0_4.InputBegan:Connect(function(v2_163, v2_164)
-		local v2_165 = v1_68._listening
-		if v2_165 then
-			if v2_163.UserInputType == Enum.UserInputType.Keyboard then
+	table.insert(v1_107._connections, v0_4.InputBegan:Connect(function(v2_202, v2_203)
+		local v2_204 = v1_107._listening
+		if v2_204 then
+			if v2_202.UserInputType == Enum.UserInputType.Keyboard then
 				if not v0_4:GetFocusedTextBox() then
-					v2_165:_capture(v2_163.KeyCode)
+					v2_204:_capture(v2_202.KeyCode)
 				end
-			elseif v0_19(v2_163) and not v2_164 then
-				v2_165:_stopListening()
+			elseif v0_19(v2_202) and not v2_203 then
+				v2_204:_stopListening()
 			end
 			return
 		end
-		if v2_164 or v2_163.UserInputType ~= Enum.UserInputType.Keyboard then return end
-		local v2_166 = v2_163.KeyCode
-		if #v1_68._dialogs > 0 then
-			if v2_166 == Enum.KeyCode.Escape then
-				local v4_167 = v1_68._dialogs[#v1_68._dialogs]
-				if v4_167.Dismissable then v4_167.Close() end
+		if v2_203 or v2_202.UserInputType ~= Enum.UserInputType.Keyboard then return end
+		local v2_205 = v2_202.KeyCode
+		if #v1_107._dialogs > 0 then
+			if v2_205 == Enum.KeyCode.Escape then
+				local v4_206 = v1_107._dialogs[#v1_107._dialogs]
+				if v4_206.Dismissable then v4_206.Close() end
 			end
 			return
 		end
-		if v1_68._toggleKey and v2_166 == v1_68._toggleKey then
-			v1_68:Toggle()
+		if v1_107._toggleKey and v2_205 == v1_107._toggleKey then
+			v1_107:Toggle()
 			return
 		end
-		for v3_168, v3_169 in ipairs(table.clone(v1_68._binds)) do
-			if v3_169._key == v2_166 and not v3_169._destroyed then
-				v3_169._onPress()
+		for v3_207, v3_208 in ipairs(table.clone(v1_107._binds)) do
+			if v3_208._key == v2_205 and not v3_208._destroyed then
+				v3_208._onPress()
 			end
 		end
 	end))
-	if v1_67.StartHidden then
-		v1_71.Visible = false
-		v1_68:_updateWatermark()
+	if v1_106.StartHidden then
+		v1_110.Visible = false
+		v1_107:_updateWatermark()
 	else
-		v1_68:Show()
+		v1_107:Show()
 	end
-	return v1_68
+	return v1_107
 end
-function v0_1:SetIcon(v1_170, v1_171)
-	local v1_172 = self._logo
-	if not v1_172 then
-		local v2_173 = Instance.new("Frame")
-		v2_173.Name = "Logo"
-		v2_173.Size = UDim2.new(0, 36, 0, 36)
-		v2_173.BackgroundTransparency = 1
-		v2_173.BorderSizePixel = 0
-		v2_173.LayoutOrder = 0
-		v2_173.Visible = false
-		v2_173.Parent = self.Sidebar
-		local v2_174 = Instance.new("ImageLabel")
-		v2_174.Name = "Icon"
-		v2_174.AnchorPoint = Vector2.new(0.5, 0.5)
-		v2_174.Position = UDim2.new(0.5, 0, 0.5, 0)
-		v2_174.Size = UDim2.new(0, 26, 0, 26)
-		v2_174.BackgroundTransparency = 1
-		v2_174.BorderSizePixel = 0
-		v2_174.ScaleType = Enum.ScaleType.Fit
-		v2_174.Parent = v2_173
-		v1_172 = { Holder = v2_173, Img = v2_174 }
-		self._logo = v1_172
+function v0_1:SetIcon(v1_209, v1_210)
+	local v1_211 = self._logo
+	if not v1_211 then
+		local v2_212 = Instance.new("Frame")
+		v2_212.Name = "Logo"
+		v2_212.Size = UDim2.new(0, 36, 0, 36)
+		v2_212.BackgroundTransparency = 1
+		v2_212.BorderSizePixel = 0
+		v2_212.LayoutOrder = 0
+		v2_212.Visible = false
+		v2_212.Parent = self.Sidebar
+		local v2_213 = Instance.new("ImageLabel")
+		v2_213.Name = "Icon"
+		v2_213.AnchorPoint = Vector2.new(0.5, 0.5)
+		v2_213.Position = UDim2.new(0.5, 0, 0.5, 0)
+		v2_213.Size = UDim2.new(0, 26, 0, 26)
+		v2_213.BackgroundTransparency = 1
+		v2_213.BorderSizePixel = 0
+		v2_213.ScaleType = Enum.ScaleType.Fit
+		v2_213.Parent = v2_212
+		v1_211 = { Holder = v2_212, Img = v2_213 }
+		self._logo = v1_211
 	end
-	if v1_170 == nil then
-		v1_172.Holder.Visible = false
+	if v1_209 == nil then
+		v1_211.Holder.Visible = false
 		return false
 	end
-	local v1_175 = v0_44(v1_172.Img, v1_170, self.Icons)
-	v1_172.Holder.Visible = v1_175
-	if v1_175 then
-		local v2_176 = type(v1_170) == "string" and not v1_170:find("^rbx") and not v1_170:find("^https?://") and not v1_170:match("^%d+$")
-		v1_172.Img.ImageColor3 = v1_171 or (v2_176 and v0_8.Accent or Color3.new(1, 1, 1))
+	local v1_214 = v0_44(v1_211.Img, v1_209, self.Icons)
+	v1_211.Holder.Visible = v1_214
+	if v1_214 then
+		local v2_215 = type(v1_209) == "string" and not v1_209:find("^rbx") and not v1_209:find("^https?://") and not v1_209:match("^%d+$")
+		v1_211.Img.ImageColor3 = v1_210 or (v2_215 and v0_8.Accent or Color3.new(1, 1, 1))
 	end
-	return v1_175
+	return v1_214
 end
-function v0_1.CreateWindow(v1_177, v1_178)
-	return v0_1.new(v1_177 == v0_1 and v1_178 or v1_177)
+function v0_1.CreateWindow(v1_216, v1_217)
+	return v0_1.new(v1_216 == v0_1 and v1_217 or v1_216)
 end
 function v0_1:Destroy()
-	for v2_179, v2_180 in ipairs(self._connections) do
-		v2_180:Disconnect()
+	for v2_218, v2_219 in ipairs(self._connections) do
+		v2_219:Disconnect()
 	end
 	self._connections = {}
 	self._destroyed = true
 	if self._hint then pcall(self._hint.HideTip, true) end
 	if self._clock then pcall(task.cancel, self._clock) end
-	for v2_181, v2_182 in ipairs(table.clone(self._notifs or {})) do pcall(v2_182) end
-	for v2_183, v2_184 in pairs(self._cleanups) do pcall(v2_184) end
+	for v2_220, v2_221 in ipairs(table.clone(self._notifs or {})) do pcall(v2_221) end
+	for v2_222, v2_223 in pairs(self._cleanups) do pcall(v2_223) end
 	self._cleanups = {}
 	self._binds = {}
 	self._listening = nil
 	self.ScreenGui:Destroy()
 end
-local v0_185, v0_186 = 0.35, 0.2
+local v0_224, v0_225 = 0.35, 0.2
 function v0_1:_cancelAnim()
 	if self._anim then
-		for v3_187, v3_188 in ipairs(self._anim) do v3_188:Cancel() end
+		for v3_226, v3_227 in ipairs(self._anim) do v3_227:Cancel() end
 		self._anim = nil
 	end
 end
@@ -692,8 +791,8 @@ function v0_1:Show()
 	self:_cancelAnim()
 	self.Main.Visible = true
 	self._anim = {
-		v0_12(self.Main, { GroupTransparency = 0 }, v0_185, Enum.EasingStyle.Quint),
-		v0_12(self._scale, { Scale = 1 }, v0_185, Enum.EasingStyle.Back),
+		v0_12(self.Main, { GroupTransparency = 0 }, v0_224, Enum.EasingStyle.Quint),
+		v0_12(self._scale, { Scale = 1 }, v0_224, Enum.EasingStyle.Back),
 	}
 	self:_updateWatermark()
 end
@@ -701,13 +800,13 @@ function v0_1:Hide()
 	if self._destroyed or not self._visible then return end
 	self._visible = false
 	self:_cancelAnim()
-	local v1_189 = v0_4:GetFocusedTextBox()
-	if v1_189 and v1_189:IsDescendantOf(self.Main) then v1_189:ReleaseFocus() end
-	local v1_190 = v0_12(self.Main, { GroupTransparency = 1 }, v0_186, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-	local v1_191 = v0_12(self._scale, { Scale = 0.92 }, v0_186, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-	self._anim = { v1_190, v1_191 }
-	v1_190.Completed:Connect(function(v2_192)
-		if v2_192 == Enum.PlaybackState.Completed and not self._visible and not self._destroyed then
+	local v1_228 = v0_4:GetFocusedTextBox()
+	if v1_228 and v1_228:IsDescendantOf(self.Main) then v1_228:ReleaseFocus() end
+	local v1_229 = v0_12(self.Main, { GroupTransparency = 1 }, v0_225, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+	local v1_230 = v0_12(self._scale, { Scale = 0.92 }, v0_225, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+	self._anim = { v1_229, v1_230 }
+	v1_229.Completed:Connect(function(v2_231)
+		if v2_231 == Enum.PlaybackState.Completed and not self._visible and not self._destroyed then
 			self.Main.Visible = false
 		end
 	end)
@@ -720,321 +819,127 @@ function v0_1:IsVisible()
 	return self._visible == true
 end
 function v0_1:_updateScrollHint()
-	local v1_193 = self._hint
-	if not v1_193 or self._destroyed then return end
-	local v1_194 = self.ActiveTab and self.ActiveTab.Page
-	local v1_195 = false
-	if v1_194 and v1_194.Visible then
-		local v2_196 = v1_194.AbsoluteCanvasSize.Y - (v1_194.CanvasPosition.Y + v1_194.AbsoluteWindowSize.Y)
-		v1_195 = v2_196 > 4
+	local v1_232 = self._hint
+	if not v1_232 or self._destroyed then return end
+	local v1_233 = self.ActiveTab and self.ActiveTab.Page
+	local v1_234 = false
+	if v1_233 and v1_233.Visible then
+		local v2_235 = v1_233.AbsoluteCanvasSize.Y - (v1_233.CanvasPosition.Y + v1_233.AbsoluteWindowSize.Y)
+		v1_234 = v2_235 > 4
 	end
-	if v1_195 == v1_193.Shown then return end
-	v1_193.Shown = v1_195
-	if v1_193.Fade then v1_193.Fade:Cancel() end
-	if v1_195 then
-		v1_193.Frame.Visible = true
-		v1_193.Icon.Position = UDim2.new(0.5, 0, 0.5, -3)
-		v1_193.Bounce:Play()
-		v1_193.Fade = v0_12(v1_193.Frame, { GroupTransparency = 0.15 }, 0.2)
+	if v1_234 == v1_232.Shown then return end
+	v1_232.Shown = v1_234
+	if v1_232.Fade then v1_232.Fade:Cancel() end
+	if v1_234 then
+		v1_232.Frame.Visible = true
+		v1_232.Icon.Position = UDim2.new(0.5, 0, 0.5, -3)
+		v1_232.Bounce:Play()
+		v1_232.Fade = v0_12(v1_232.Frame, { GroupTransparency = 0.15 }, 0.2)
 	else
-		v1_193.HideTip()
-		local v2_197 = v0_12(v1_193.Frame, { GroupTransparency = 1 }, 0.2)
-		v1_193.Fade = v2_197
-		v2_197.Completed:Connect(function(v3_198)
-			if v3_198 == Enum.PlaybackState.Completed and not v1_193.Shown then
-				v1_193.Bounce:Cancel()
-				v1_193.Frame.Visible = false
+		v1_232.HideTip()
+		local v2_236 = v0_12(v1_232.Frame, { GroupTransparency = 1 }, 0.2)
+		v1_232.Fade = v2_236
+		v2_236.Completed:Connect(function(v3_237)
+			if v3_237 == Enum.PlaybackState.Completed and not v1_232.Shown then
+				v1_232.Bounce:Cancel()
+				v1_232.Frame.Visible = false
 			end
 		end)
 	end
 end
-function v0_1:_keyTaken(v1_199, v1_200)
-	if not v1_199 then return false end
-	if v1_199 == self._toggleKey then return true end
-	for v2_201, v2_202 in ipairs(self._binds) do
-		if v2_202 ~= v1_200 and v2_202._key == v1_199 then return true end
+function v0_1:_keyTaken(v1_238, v1_239)
+	if not v1_238 then return false end
+	if v1_238 == self._toggleKey then return true end
+	for v2_240, v2_241 in ipairs(self._binds) do
+		if v2_241 ~= v1_239 and v2_241._key == v1_238 then return true end
 	end
 	return false
 end
-local v0_203, v0_204 = 280, 5
+local v0_242, v0_243 = 280, 5
 function v0_1:_getNotifyContainer()
 	if self._notifyContainer and self._notifyContainer.Parent then
 		return self._notifyContainer
 	end
-	local v1_205 = self.ScreenGui.AbsoluteSize
-	local v1_206 = v1_205.X > 0 and math.min(v0_203, v1_205.X - 20) or v0_203
-	local v1_207 = Instance.new("Frame")
-	v1_207.Name = "Notifications"
-	v1_207.AnchorPoint = Vector2.new(0.5, 0)
-	v1_207.Position = UDim2.new(0.5, 0, 0, self._wm and 48 or 10)
-	v1_207.Size = UDim2.new(0, v1_206, 0, 0)
-	v1_207.AutomaticSize = Enum.AutomaticSize.Y
-	v1_207.BackgroundTransparency = 1
-	v1_207.BorderSizePixel = 0
-	v1_207.Parent = self.ScreenGui
-	local v1_208 = Instance.new("UIListLayout")
-	v1_208.Padding = UDim.new(0, 6)
-	v1_208.SortOrder = Enum.SortOrder.LayoutOrder
-	v1_208.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	v1_208.Parent = v1_207
-	self._notifyContainer = v1_207
-	return v1_207
+	local v1_244 = self.ScreenGui.AbsoluteSize
+	local v1_245 = v1_244.X > 0 and math.min(v0_242, v1_244.X - 20) or v0_242
+	local v1_246 = Instance.new("Frame")
+	v1_246.Name = "Notifications"
+	v1_246.AnchorPoint = Vector2.new(0.5, 0)
+	v1_246.Position = UDim2.new(0.5, 0, 0, self._wm and 48 or 10)
+	v1_246.Size = UDim2.new(0, v1_245, 0, 0)
+	v1_246.AutomaticSize = Enum.AutomaticSize.Y
+	v1_246.BackgroundTransparency = 1
+	v1_246.BorderSizePixel = 0
+	v1_246.Parent = self.ScreenGui
+	local v1_247 = Instance.new("UIListLayout")
+	v1_247.Padding = UDim.new(0, 6)
+	v1_247.SortOrder = Enum.SortOrder.LayoutOrder
+	v1_247.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	v1_247.Parent = v1_246
+	self._notifyContainer = v1_246
+	return v1_246
 end
-function v0_1:Notify(v1_209)
+function v0_1:Notify(v1_248)
 	if self._destroyed then return end
-	if type(v1_209) == "string" then v1_209 = { Content = v1_209 } end
-	v1_209 = v1_209 or {}
-	local v1_210 = tonumber(v1_209.Duration) or 4
-	local v1_211 = self:_getNotifyContainer()
+	if type(v1_248) == "string" then v1_248 = { Content = v1_248 } end
+	v1_248 = v1_248 or {}
+	local v1_249 = tonumber(v1_248.Duration) or 4
+	local v1_250 = self:_getNotifyContainer()
 	self._notifyCount = (self._notifyCount or 0) + 1
 	self._notifs = self._notifs or {}
-	local v1_212 = false
-	local v1_213 = Instance.new("Frame")
-	v1_213.Name = "Notification"
-	v1_213.Size = UDim2.new(1, 0, 0, 0)
-	v1_213.BackgroundTransparency = 1
-	v1_213.BorderSizePixel = 0
-	v1_213.LayoutOrder = self._notifyCount
-	v1_213.Parent = v1_211
-	local v1_214 = Instance.new("CanvasGroup")
-	v1_214.Name = "Card"
-	v1_214.Size = UDim2.new(1, 0, 0, 0)
-	v1_214.AutomaticSize = Enum.AutomaticSize.Y
-	v1_214.BackgroundColor3 = v0_8.Sidebar
-	v1_214.BorderSizePixel = 0
-	v1_214.GroupTransparency = 1
-	v1_214.Parent = v1_213
-	v0_63(v1_214, 8)
-	local v1_215 = Instance.new("UIStroke")
-	v1_215.Color = v0_8.Element
-	v1_215.Thickness = 1
-	v1_215.Transparency = 1
-	v1_215.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	v1_215.Parent = v1_214
-	local v1_216 = Instance.new("Frame")
-	v1_216.Name = "Body"
-	v1_216.Size = UDim2.new(1, 0, 0, 0)
-	v1_216.AutomaticSize = Enum.AutomaticSize.Y
-	v1_216.BackgroundTransparency = 1
-	v1_216.BorderSizePixel = 0
-	v1_216.Parent = v1_214
-	local v1_217 = Instance.new("UIPadding")
-	v1_217.PaddingTop = UDim.new(0, 8)
-	v1_217.PaddingBottom = UDim.new(0, 8)
-	v1_217.PaddingLeft = UDim.new(0, 12)
-	v1_217.PaddingRight = UDim.new(0, 12)
-	v1_217.Parent = v1_216
-	local v1_218 = Instance.new("UISizeConstraint")
-	v1_218.MinSize = Vector2.new(0, 30)
-	v1_218.Parent = v1_216
-	local v1_219 = Instance.new("Frame")
-	v1_219.Name = "Texts"
-	v1_219.Position = UDim2.new(0, 0, 0, 0)
-	v1_219.Size = UDim2.new(1, 0, 0, 0)
-	v1_219.AutomaticSize = Enum.AutomaticSize.Y
-	v1_219.BackgroundTransparency = 1
-	v1_219.BorderSizePixel = 0
-	v1_219.Parent = v1_216
-	local v1_220 = Instance.new("UIListLayout")
-	v1_220.Padding = UDim.new(0, 2)
-	v1_220.SortOrder = Enum.SortOrder.LayoutOrder
-	v1_220.Parent = v1_219
-	local function v1_221(v2_222, v2_223, v2_224, v2_225, v2_226)
-		local v2_227 = Instance.new("TextLabel")
-		v2_227.Size = UDim2.new(1, 0, 0, 0)
-		v2_227.AutomaticSize = Enum.AutomaticSize.Y
-		v2_227.BackgroundTransparency = 1
-		v2_227.BorderSizePixel = 0
-		v2_227.Text = v2_222
-		v2_227.TextColor3 = v2_225
-		v2_227.Font = v2_223
-		v2_227.TextSize = v2_224
-		v2_227.TextWrapped = true
-		v2_227.TextXAlignment = Enum.TextXAlignment.Left
-		v2_227.TextYAlignment = Enum.TextYAlignment.Top
-		v2_227.LayoutOrder = v2_226
-		v2_227.Parent = v1_219
-		return v2_227
-	end
-	if v1_209.Title and v1_209.Title ~= "" then
-		v1_221(tostring(v1_209.Title), Enum.Font.GothamBold, 13, v0_8.Text, 1).Name = "Title"
-	end
-	if v1_209.Content and v1_209.Content ~= "" then
-		v1_221(tostring(v1_209.Content), Enum.Font.Gotham, 12, v0_8.SubText, 2).Name = "Content"
-	end
-	local v1_228 = Instance.new("TextLabel")
-	v1_228.Name = "Countdown"
-	v1_228.AnchorPoint = Vector2.new(1, 0.5)
-	v1_228.Position = UDim2.new(1, 0, 0.5, 0)
-	v1_228.Size = UDim2.new(0, 18, 0, 18)
-	v1_228.BackgroundTransparency = 1
-	v1_228.BorderSizePixel = 0
-	v1_228.Text = tostring(math.ceil(v1_210))
-	v1_228.TextColor3 = v0_8.SubText
-	v1_228.Font = Enum.Font.GothamBold
-	v1_228.TextSize = 13
-	v1_228.TextXAlignment = Enum.TextXAlignment.Right
-	v1_228.Visible = v1_210 > 0
-	v1_228.Parent = v1_216
-	if v1_210 > 0 then
-		v1_219.Size = UDim2.new(1, -24, 0, 0)
-	end
-	local v1_229 = Instance.new("TextButton")
-	v1_229.Name = "Click"
-	v1_229.Size = UDim2.new(1, 0, 1, 0)
-	v1_229.BackgroundTransparency = 1
-	v1_229.BorderSizePixel = 0
-	v1_229.Text = ""
-	v1_229.AutoButtonColor = false
-	v1_229.Parent = v1_214
-	local v1_230, v1_231 = nil, nil
-	local v1_232 = {}
-	local function v1_233()
-		if v1_212 then return end
-		v1_212 = true
-		local v2_234 = table.find(self._notifs, v1_233)
-		if v2_234 then table.remove(self._notifs, v2_234) end
-		if v1_230 and v1_230 ~= coroutine.running() then
-			pcall(task.cancel, v1_230)
-		end
-		v1_230 = nil
-		if v1_231 then
-			v1_231:Disconnect()
-			v1_231 = nil
-		end
-		for v3_235, v3_236 in ipairs(v1_232) do v3_236:Cancel() end
-		v1_232 = {}
-		if self._destroyed then return end
-		v0_12(v1_215, { Transparency = 1 }, 0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-		local v2_237 = v0_12(v1_214, {
-			Position = UDim2.new(0, 0, 0, -20),
-			GroupTransparency = 1,
-		}, 0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-		v2_237.Completed:Connect(function()
-			local v3_238 = v0_12(v1_213, { Size = UDim2.new(1, 0, 0, 0) }, 0.2, Enum.EasingStyle.Quint)
-			v3_238.Completed:Connect(function()
-				v1_213:Destroy()
-			end)
-		end)
-	end
-	v1_229.MouseButton1Click:Connect(v1_233)
-	table.insert(self._notifs, v1_233)
-	while #self._notifs > v0_204 do
-		self._notifs[1]()
-	end
-	local v1_239 = false
-	v1_231 = v1_214:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-		if v1_212 then return end
-		local v2_240 = v1_214.AbsoluteSize.Y
-		if v2_240 <= 0 then return end
-		if not v1_239 then
-			v1_239 = true
-			table.insert(v1_232, v0_12(v1_213, { Size = UDim2.new(1, 0, 0, v2_240) }, 0.3, Enum.EasingStyle.Quint))
-		else
-			v1_213.Size = UDim2.new(1, 0, 0, v2_240)
-		end
-	end)
-	v1_214.Position = UDim2.new(0, 0, 0, -(v1_211.AbsolutePosition.Y + v1_211.AbsoluteSize.Y + 90))
-	v1_232 = {
-		v0_12(v1_214, { Position = UDim2.new(0, 0, 0, 0) }, 0.45, Enum.EasingStyle.Back),
-		v0_12(v1_214, { GroupTransparency = 0 }, 0.25),
-		v0_12(v1_215, { Transparency = 0 }, 0.25),
-	}
-	if v1_210 > 0 then
-		v1_230 = task.spawn(function()
-			local v3_241 = os.clock()
-			local v3_242 = math.ceil(v1_210)
-			while not v1_212 and not self._destroyed do
-				local v4_243 = v1_210 - (os.clock() - v3_241)
-				local v4_244 = math.max(math.ceil(v4_243), 0)
-				if v4_244 ~= v3_242 then
-					v3_242 = v4_244
-					v1_228.Text = tostring(v4_244)
-					v1_228.TextTransparency = 0.6
-					v0_12(v1_228, { TextTransparency = 0 }, 0.2)
-				end
-				if v4_243 <= 0 then
-					v1_230 = nil
-					v1_233()
-					return
-				end
-				task.wait(v4_243 - (v4_244 - 1))
-			end
-		end)
-	end
-	return { Dismiss = v1_233 }
-end
-function v0_1:Dialog(v1_245)
-	if self._destroyed then return end
-	v1_245 = v1_245 or {}
-	local v1_246 = v1_245.Buttons
-	if type(v1_246) ~= "table" or #v1_246 == 0 then
-		v1_246 = { { Title = "OK", Primary = true } }
-	end
-	local v1_247 = false
-	local v1_248 = {}
-	local v1_249 = { Dismissable = v1_245.Dismissable ~= false }
-	local v1_250 = Instance.new("Frame")
-	v1_250.Name = "DialogOverlay"
-	v1_250.Size = UDim2.new(1, 0, 1, 0)
-	v1_250.BackgroundTransparency = 1
-	v1_250.BorderSizePixel = 0
-	v1_250.ZIndex = 100 + #self._dialogs
-	v1_250.Parent = self.ScreenGui
-	local v1_251 = Instance.new("TextButton")
-	v1_251.Name = "Backdrop"
-	v1_251.Size = UDim2.new(1, 0, 1, 0)
-	v1_251.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-	v1_251.BackgroundTransparency = 1
-	v1_251.BorderSizePixel = 0
-	v1_251.Text = ""
-	v1_251.AutoButtonColor = false
-	v1_251.Parent = v1_250
-	local v1_252 = Instance.new("CanvasGroup")
-	v1_252.Name = "Dialog"
-	v1_252.AnchorPoint = Vector2.new(0.5, 0.5)
-	v1_252.Position = UDim2.new(0.5, 0, 0.5, 0)
-	v1_252.Size = UDim2.new(0.9, 0, 0, 0)
-	v1_252.AutomaticSize = Enum.AutomaticSize.Y
-	v1_252.BackgroundColor3 = v0_8.Sidebar
+	local v1_251 = false
+	local v1_252 = Instance.new("Frame")
+	v1_252.Name = "Notification"
+	v1_252.Size = UDim2.new(1, 0, 0, 0)
+	v1_252.BackgroundTransparency = 1
 	v1_252.BorderSizePixel = 0
-	v1_252.GroupTransparency = 1
-	v1_252.Active = true
-	v1_252.ZIndex = 2
+	v1_252.LayoutOrder = self._notifyCount
 	v1_252.Parent = v1_250
-	v0_63(v1_252, 8)
-	local v1_253 = Instance.new("UISizeConstraint")
-	v1_253.MinSize = Vector2.new(200, 0)
-	v1_253.MaxSize = Vector2.new(320, math.huge)
+	local v1_253 = Instance.new("CanvasGroup")
+	v1_253.Name = "Card"
+	v1_253.Size = UDim2.new(1, 0, 0, 0)
+	v1_253.AutomaticSize = Enum.AutomaticSize.Y
+	v1_253.BackgroundColor3 = v0_8.Sidebar
+	v1_253.BorderSizePixel = 0
+	v1_253.GroupTransparency = 1
 	v1_253.Parent = v1_252
-	local v1_254 = Instance.new("UIScale")
-	v1_254.Scale = 0.92
-	v1_254.Parent = v1_252
-	local v1_255 = Instance.new("UIStroke")
-	v1_255.Color = v0_8.Element
-	v1_255.Thickness = 1
-	v1_255.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	v1_255.Parent = v1_252
-	local v1_256 = Instance.new("Frame")
-	v1_256.Name = "Body"
-	v1_256.Size = UDim2.new(1, 0, 0, 0)
-	v1_256.AutomaticSize = Enum.AutomaticSize.Y
-	v1_256.BackgroundTransparency = 1
-	v1_256.BorderSizePixel = 0
-	v1_256.Parent = v1_252
-	local v1_257 = Instance.new("UIPadding")
-	v1_257.PaddingTop = UDim.new(0, 14)
-	v1_257.PaddingBottom = UDim.new(0, 14)
-	v1_257.PaddingLeft = UDim.new(0, 14)
-	v1_257.PaddingRight = UDim.new(0, 14)
-	v1_257.Parent = v1_256
-	local v1_258 = Instance.new("UIListLayout")
-	v1_258.Padding = UDim.new(0, 8)
-	v1_258.SortOrder = Enum.SortOrder.LayoutOrder
-	v1_258.Parent = v1_256
-	local function v1_259(v2_260, v2_261, v2_262, v2_263, v2_264, v2_265)
+	v0_63(v1_253, 8)
+	local v1_254 = Instance.new("UIStroke")
+	v1_254.Color = v0_8.Element
+	v1_254.Thickness = 1
+	v1_254.Transparency = 1
+	v1_254.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	v1_254.Parent = v1_253
+	local v1_255 = Instance.new("Frame")
+	v1_255.Name = "Body"
+	v1_255.Size = UDim2.new(1, 0, 0, 0)
+	v1_255.AutomaticSize = Enum.AutomaticSize.Y
+	v1_255.BackgroundTransparency = 1
+	v1_255.BorderSizePixel = 0
+	v1_255.Parent = v1_253
+	local v1_256 = Instance.new("UIPadding")
+	v1_256.PaddingTop = UDim.new(0, 8)
+	v1_256.PaddingBottom = UDim.new(0, 8)
+	v1_256.PaddingLeft = UDim.new(0, 12)
+	v1_256.PaddingRight = UDim.new(0, 12)
+	v1_256.Parent = v1_255
+	local v1_257 = Instance.new("UISizeConstraint")
+	v1_257.MinSize = Vector2.new(0, 30)
+	v1_257.Parent = v1_255
+	local v1_258 = Instance.new("Frame")
+	v1_258.Name = "Texts"
+	v1_258.Position = UDim2.new(0, 0, 0, 0)
+	v1_258.Size = UDim2.new(1, 0, 0, 0)
+	v1_258.AutomaticSize = Enum.AutomaticSize.Y
+	v1_258.BackgroundTransparency = 1
+	v1_258.BorderSizePixel = 0
+	v1_258.Parent = v1_255
+	local v1_259 = Instance.new("UIListLayout")
+	v1_259.Padding = UDim.new(0, 2)
+	v1_259.SortOrder = Enum.SortOrder.LayoutOrder
+	v1_259.Parent = v1_258
+	local function v1_260(v2_261, v2_262, v2_263, v2_264, v2_265)
 		local v2_266 = Instance.new("TextLabel")
-		v2_266.Name = v2_260
 		v2_266.Size = UDim2.new(1, 0, 0, 0)
 		v2_266.AutomaticSize = Enum.AutomaticSize.Y
 		v2_266.BackgroundTransparency = 1
@@ -1047,567 +952,761 @@ function v0_1:Dialog(v1_245)
 		v2_266.TextXAlignment = Enum.TextXAlignment.Left
 		v2_266.TextYAlignment = Enum.TextYAlignment.Top
 		v2_266.LayoutOrder = v2_265
-		v2_266.Parent = v1_256
+		v2_266.Parent = v1_258
 		return v2_266
 	end
-	if v1_245.Title and v1_245.Title ~= "" then
-		v1_259("Title", tostring(v1_245.Title), Enum.Font.GothamBold, 15, v0_8.Text, 1)
+	if v1_248.Title and v1_248.Title ~= "" then
+		v1_260(self:T(tostring(v1_248.Title)), Enum.Font.GothamBold, 13, v0_8.Text, 1).Name = "Title"
 	end
-	if v1_245.Content and v1_245.Content ~= "" then
-		v1_259("Content", tostring(v1_245.Content), Enum.Font.Gotham, 13, v0_8.SubText, 2)
+	if v1_248.Content and v1_248.Content ~= "" then
+		v1_260(self:T(tostring(v1_248.Content)), Enum.Font.Gotham, 12, v0_8.SubText, 2).Name = "Content"
 	end
-	local v1_267 = Instance.new("Frame")
-	v1_267.Name = "Buttons"
-	v1_267.Size = UDim2.new(1, 0, 0, 30)
+	local v1_267 = Instance.new("TextLabel")
+	v1_267.Name = "Countdown"
+	v1_267.AnchorPoint = Vector2.new(1, 0.5)
+	v1_267.Position = UDim2.new(1, 0, 0.5, 0)
+	v1_267.Size = UDim2.new(0, 18, 0, 18)
 	v1_267.BackgroundTransparency = 1
 	v1_267.BorderSizePixel = 0
-	v1_267.LayoutOrder = 3
-	v1_267.Parent = v1_256
-	local v1_268 = Instance.new("UIListLayout")
-	v1_268.FillDirection = Enum.FillDirection.Horizontal
-	v1_268.HorizontalAlignment = Enum.HorizontalAlignment.Right
-	v1_268.VerticalAlignment = Enum.VerticalAlignment.Center
-	v1_268.Padding = UDim.new(0, 8)
-	v1_268.SortOrder = Enum.SortOrder.LayoutOrder
-	v1_268.Parent = v1_267
-	local function v1_269()
-		if v1_247 then return end
-		v1_247 = true
-		local v2_270 = table.find(self._dialogs, v1_249)
-		if v2_270 then table.remove(self._dialogs, v2_270) end
-		for v3_271, v3_272 in ipairs(v1_248) do v3_272:Cancel() end
-		v1_248 = {}
-		if self._destroyed or not v1_250.Parent then return end
-		v0_12(v1_251, { BackgroundTransparency = 1 }, 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-		v0_12(v1_254, { Scale = 0.94 }, 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-		local v2_273 = v0_12(v1_252, { GroupTransparency = 1 }, 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-		v2_273.Completed:Connect(function()
-			v1_250:Destroy()
+	v1_267.Text = tostring(math.ceil(v1_249))
+	v1_267.TextColor3 = v0_8.SubText
+	v1_267.Font = Enum.Font.GothamBold
+	v1_267.TextSize = 13
+	v1_267.TextXAlignment = Enum.TextXAlignment.Right
+	v1_267.Visible = v1_249 > 0
+	v1_267.Parent = v1_255
+	if v1_249 > 0 then
+		v1_258.Size = UDim2.new(1, -24, 0, 0)
+	end
+	local v1_268 = Instance.new("TextButton")
+	v1_268.Name = "Click"
+	v1_268.Size = UDim2.new(1, 0, 1, 0)
+	v1_268.BackgroundTransparency = 1
+	v1_268.BorderSizePixel = 0
+	v1_268.Text = ""
+	v1_268.AutoButtonColor = false
+	v1_268.Parent = v1_253
+	local v1_269, v1_270 = nil, nil
+	local v1_271 = {}
+	local function v1_272()
+		if v1_251 then return end
+		v1_251 = true
+		local v2_273 = table.find(self._notifs, v1_272)
+		if v2_273 then table.remove(self._notifs, v2_273) end
+		if v1_269 and v1_269 ~= coroutine.running() then
+			pcall(task.cancel, v1_269)
+		end
+		v1_269 = nil
+		if v1_270 then
+			v1_270:Disconnect()
+			v1_270 = nil
+		end
+		for v3_274, v3_275 in ipairs(v1_271) do v3_275:Cancel() end
+		v1_271 = {}
+		if self._destroyed then return end
+		v0_12(v1_254, { Transparency = 1 }, 0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		local v2_276 = v0_12(v1_253, {
+			Position = UDim2.new(0, 0, 0, -20),
+			GroupTransparency = 1,
+		}, 0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		v2_276.Completed:Connect(function()
+			local v3_277 = v0_12(v1_252, { Size = UDim2.new(1, 0, 0, 0) }, 0.2, Enum.EasingStyle.Quint)
+			v3_277.Completed:Connect(function()
+				v1_252:Destroy()
+			end)
 		end)
 	end
-	v1_249.Close = v1_269
-	for v2_274, v2_275 in ipairs(v1_246) do
-		local v2_276 = v2_275.Primary == true
-		local v2_277 = v2_276 and v0_8.Accent or v0_8.Element
-		local v2_278 = v2_276 and v0_8.Accent:Lerp(v0_8.Text, 0.15) or v0_8.Hover
-		local v2_279 = Instance.new("TextButton")
-		v2_279.Name = "Button"
-		v2_279.Size = UDim2.new(0, 0, 0, 30)
-		v2_279.AutomaticSize = Enum.AutomaticSize.X
-		v2_279.BackgroundColor3 = v2_277
-		v2_279.BorderSizePixel = 0
-		v2_279.Text = tostring(v2_275.Title or "OK")
-		v2_279.TextColor3 = v0_8.Text
-		v2_279.Font = Enum.Font.Gotham
-		v2_279.TextSize = 13
-		v2_279.AutoButtonColor = false
-		v2_279.LayoutOrder = v2_274
-		v2_279.Parent = v1_267
-		v0_63(v2_279, 6)
-		local v2_280 = Instance.new("UIPadding")
-		v2_280.PaddingLeft = UDim.new(0, 14)
-		v2_280.PaddingRight = UDim.new(0, 14)
-		v2_280.Parent = v2_279
-		v0_21(v2_279, v2_277, v2_278)
-		v2_279.MouseButton1Click:Connect(function()
-			if v1_247 then return end
-			v1_269()
-			if v2_275.Callback then v2_275.Callback() end
-		end)
+	v1_268.MouseButton1Click:Connect(v1_272)
+	table.insert(self._notifs, v1_272)
+	while #self._notifs > v0_243 do
+		self._notifs[1]()
 	end
-	v1_251.MouseButton1Click:Connect(function()
-		if v1_249.Dismissable then v1_269() end
+	local v1_278 = false
+	v1_270 = v1_253:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+		if v1_251 then return end
+		local v2_279 = v1_253.AbsoluteSize.Y
+		if v2_279 <= 0 then return end
+		if not v1_278 then
+			v1_278 = true
+			table.insert(v1_271, v0_12(v1_252, { Size = UDim2.new(1, 0, 0, v2_279) }, 0.3, Enum.EasingStyle.Quint))
+		else
+			v1_252.Size = UDim2.new(1, 0, 0, v2_279)
+		end
 	end)
-	table.insert(self._dialogs, v1_249)
-	v1_248 = {
-		v0_12(v1_251, { BackgroundTransparency = 0.45 }, 0.2),
-		v0_12(v1_252, { GroupTransparency = 0 }, 0.22),
-		v0_12(v1_254, { Scale = 1 }, 0.3, Enum.EasingStyle.Back),
+	v1_253.Position = UDim2.new(0, 0, 0, -(v1_250.AbsolutePosition.Y + v1_250.AbsoluteSize.Y + 90))
+	v1_271 = {
+		v0_12(v1_253, { Position = UDim2.new(0, 0, 0, 0) }, 0.45, Enum.EasingStyle.Back),
+		v0_12(v1_253, { GroupTransparency = 0 }, 0.25),
+		v0_12(v1_254, { Transparency = 0 }, 0.25),
 	}
-	return { Close = v1_269 }
+	if v1_249 > 0 then
+		v1_269 = task.spawn(function()
+			local v3_280 = os.clock()
+			local v3_281 = math.ceil(v1_249)
+			while not v1_251 and not self._destroyed do
+				local v4_282 = v1_249 - (os.clock() - v3_280)
+				local v4_283 = math.max(math.ceil(v4_282), 0)
+				if v4_283 ~= v3_281 then
+					v3_281 = v4_283
+					v1_267.Text = tostring(v4_283)
+					v1_267.TextTransparency = 0.6
+					v0_12(v1_267, { TextTransparency = 0 }, 0.2)
+				end
+				if v4_282 <= 0 then
+					v1_269 = nil
+					v1_272()
+					return
+				end
+				task.wait(v4_282 - (v4_283 - 1))
+			end
+		end)
+	end
+	return { Dismiss = v1_272 }
 end
-function v0_1:_buildWatermark(v1_281)
-	local v1_282 = Instance.new("Frame")
-	v1_282.Name = "Watermark"
-	v1_282.AnchorPoint = Vector2.new(0.5, 0)
-	v1_282.Position = UDim2.new(0.5, 0, 0, -40)
-	v1_282.Size = UDim2.new(0, 0, 0, 30)
-	v1_282.AutomaticSize = Enum.AutomaticSize.X
-	v1_282.BackgroundColor3 = v0_8.Sidebar
-	v1_282.BorderSizePixel = 0
-	v1_282.Parent = self.ScreenGui
-	v0_63(v1_282, 8)
-	local v1_283 = Instance.new("UIStroke")
-	v1_283.Color = v0_8.Element
-	v1_283.Thickness = 1
-	v1_283.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	v1_283.Parent = v1_282
-	local v1_284 = Instance.new("UIPadding")
-	v1_284.PaddingLeft = UDim.new(0, 10)
-	v1_284.PaddingRight = UDim.new(0, 4)
-	v1_284.Parent = v1_282
-	local v1_285 = Instance.new("UIListLayout")
-	v1_285.FillDirection = Enum.FillDirection.Horizontal
-	v1_285.VerticalAlignment = Enum.VerticalAlignment.Center
-	v1_285.Padding = UDim.new(0, 8)
-	v1_285.SortOrder = Enum.SortOrder.LayoutOrder
-	v1_285.Parent = v1_282
-	local v1_286 = Instance.new("TextLabel")
-	v1_286.Name = "Title"
-	v1_286.Size = UDim2.new(0, 0, 1, 0)
-	v1_286.AutomaticSize = Enum.AutomaticSize.X
-	v1_286.BackgroundTransparency = 1
-	v1_286.BorderSizePixel = 0
-	v1_286.Text = v1_281
-	v1_286.TextColor3 = v0_8.SubText
-	v1_286.Font = Enum.Font.GothamBold
-	v1_286.TextSize = 13
-	v1_286.LayoutOrder = 1
-	v1_286.Parent = v1_282
-	local v1_287 = Instance.new("TextButton")
-	v1_287.Name = "ToggleButton"
-	v1_287.Size = UDim2.new(0, 22, 0, 22)
-	v1_287.BackgroundColor3 = v0_8.Element
-	v1_287.BorderSizePixel = 0
-	v1_287.Text = ""
-	v1_287.AutoButtonColor = false
-	v1_287.LayoutOrder = 2
-	v1_287.Parent = v1_282
-	v0_63(v1_287, 6)
-	local v1_288 = Instance.new("ImageLabel")
-	v1_288.Name = "Icon"
-	v1_288.AnchorPoint = Vector2.new(0.5, 0.5)
-	v1_288.Position = UDim2.new(0.5, 0, 0.5, 0)
-	v1_288.Size = UDim2.new(0, 14, 0, 14)
-	v1_288.BackgroundTransparency = 1
-	v1_288.BorderSizePixel = 0
-	v1_288.ImageColor3 = v0_8.IconOn
-	v1_288.ScaleType = Enum.ScaleType.Fit
-	v1_288.Parent = v1_287
-	local v1_289 = Instance.new("TextLabel")
-	v1_289.Name = "IconFallback"
+function v0_1:Dialog(v1_284)
+	if self._destroyed then return end
+	v1_284 = v1_284 or {}
+	local v1_285 = v1_284.Buttons
+	if type(v1_285) ~= "table" or #v1_285 == 0 then
+		v1_285 = { { Title = "OK", Primary = true } }
+	end
+	local v1_286 = false
+	local v1_287 = {}
+	local v1_288 = { Dismissable = v1_284.Dismissable ~= false }
+	local v1_289 = Instance.new("Frame")
+	v1_289.Name = "DialogOverlay"
 	v1_289.Size = UDim2.new(1, 0, 1, 0)
 	v1_289.BackgroundTransparency = 1
-	v1_289.TextColor3 = v0_8.IconOn
-	v1_289.Font = Enum.Font.GothamBold
-	v1_289.TextSize = 12
-	v1_289.Visible = false
-	v1_289.Parent = v1_288
-	local v1_290 = Instance.new("UIScale")
-	v1_290.Parent = v1_287
-	v1_287.MouseEnter:Connect(function() v0_12(v1_290, { Scale = 1.1 }, 0.12) end)
-	v1_287.MouseLeave:Connect(function() v0_12(v1_290, { Scale = 1 }, 0.12) end)
-	v1_287.InputBegan:Connect(function(v2_291)
-		if v0_19(v2_291) then v0_12(v1_290, { Scale = 0.9 }, 0.08) end
+	v1_289.BorderSizePixel = 0
+	v1_289.ZIndex = 100 + #self._dialogs
+	v1_289.Parent = self.ScreenGui
+	local v1_290 = Instance.new("TextButton")
+	v1_290.Name = "Backdrop"
+	v1_290.Size = UDim2.new(1, 0, 1, 0)
+	v1_290.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+	v1_290.BackgroundTransparency = 1
+	v1_290.BorderSizePixel = 0
+	v1_290.Text = ""
+	v1_290.AutoButtonColor = false
+	v1_290.Parent = v1_289
+	local v1_291 = Instance.new("CanvasGroup")
+	v1_291.Name = "Dialog"
+	v1_291.AnchorPoint = Vector2.new(0.5, 0.5)
+	v1_291.Position = UDim2.new(0.5, 0, 0.5, 0)
+	v1_291.Size = UDim2.new(0.9, 0, 0, 0)
+	v1_291.AutomaticSize = Enum.AutomaticSize.Y
+	v1_291.BackgroundColor3 = v0_8.Sidebar
+	v1_291.BorderSizePixel = 0
+	v1_291.GroupTransparency = 1
+	v1_291.Active = true
+	v1_291.ZIndex = 2
+	v1_291.Parent = v1_289
+	v0_63(v1_291, 8)
+	local v1_292 = Instance.new("UISizeConstraint")
+	v1_292.MinSize = Vector2.new(200, 0)
+	v1_292.MaxSize = Vector2.new(320, math.huge)
+	v1_292.Parent = v1_291
+	local v1_293 = Instance.new("UIScale")
+	v1_293.Scale = 0.92
+	v1_293.Parent = v1_291
+	local v1_294 = Instance.new("UIStroke")
+	v1_294.Color = v0_8.Element
+	v1_294.Thickness = 1
+	v1_294.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	v1_294.Parent = v1_291
+	local v1_295 = Instance.new("Frame")
+	v1_295.Name = "Body"
+	v1_295.Size = UDim2.new(1, 0, 0, 0)
+	v1_295.AutomaticSize = Enum.AutomaticSize.Y
+	v1_295.BackgroundTransparency = 1
+	v1_295.BorderSizePixel = 0
+	v1_295.Parent = v1_291
+	local v1_296 = Instance.new("UIPadding")
+	v1_296.PaddingTop = UDim.new(0, 14)
+	v1_296.PaddingBottom = UDim.new(0, 14)
+	v1_296.PaddingLeft = UDim.new(0, 14)
+	v1_296.PaddingRight = UDim.new(0, 14)
+	v1_296.Parent = v1_295
+	local v1_297 = Instance.new("UIListLayout")
+	v1_297.Padding = UDim.new(0, 8)
+	v1_297.SortOrder = Enum.SortOrder.LayoutOrder
+	v1_297.Parent = v1_295
+	local function v1_298(v2_299, v2_300, v2_301, v2_302, v2_303, v2_304)
+		local v2_305 = Instance.new("TextLabel")
+		v2_305.Name = v2_299
+		v2_305.Size = UDim2.new(1, 0, 0, 0)
+		v2_305.AutomaticSize = Enum.AutomaticSize.Y
+		v2_305.BackgroundTransparency = 1
+		v2_305.BorderSizePixel = 0
+		v2_305.Text = v2_300
+		v2_305.TextColor3 = v2_303
+		v2_305.Font = v2_301
+		v2_305.TextSize = v2_302
+		v2_305.TextWrapped = true
+		v2_305.TextXAlignment = Enum.TextXAlignment.Left
+		v2_305.TextYAlignment = Enum.TextYAlignment.Top
+		v2_305.LayoutOrder = v2_304
+		v2_305.Parent = v1_295
+		return v2_305
+	end
+	if v1_284.Title and v1_284.Title ~= "" then
+		v1_298("Title", self:T(tostring(v1_284.Title)), Enum.Font.GothamBold, 15, v0_8.Text, 1)
+	end
+	if v1_284.Content and v1_284.Content ~= "" then
+		v1_298("Content", self:T(tostring(v1_284.Content)), Enum.Font.Gotham, 13, v0_8.SubText, 2)
+	end
+	local v1_306 = Instance.new("Frame")
+	v1_306.Name = "Buttons"
+	v1_306.Size = UDim2.new(1, 0, 0, 30)
+	v1_306.BackgroundTransparency = 1
+	v1_306.BorderSizePixel = 0
+	v1_306.LayoutOrder = 3
+	v1_306.Parent = v1_295
+	local v1_307 = Instance.new("UIListLayout")
+	v1_307.FillDirection = Enum.FillDirection.Horizontal
+	v1_307.HorizontalAlignment = Enum.HorizontalAlignment.Right
+	v1_307.VerticalAlignment = Enum.VerticalAlignment.Center
+	v1_307.Padding = UDim.new(0, 8)
+	v1_307.SortOrder = Enum.SortOrder.LayoutOrder
+	v1_307.Parent = v1_306
+	local function v1_308()
+		if v1_286 then return end
+		v1_286 = true
+		local v2_309 = table.find(self._dialogs, v1_288)
+		if v2_309 then table.remove(self._dialogs, v2_309) end
+		for v3_310, v3_311 in ipairs(v1_287) do v3_311:Cancel() end
+		v1_287 = {}
+		if self._destroyed or not v1_289.Parent then return end
+		v0_12(v1_290, { BackgroundTransparency = 1 }, 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		v0_12(v1_293, { Scale = 0.94 }, 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		local v2_312 = v0_12(v1_291, { GroupTransparency = 1 }, 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		v2_312.Completed:Connect(function()
+			v1_289:Destroy()
+		end)
+	end
+	v1_288.Close = v1_308
+	for v2_313, v2_314 in ipairs(v1_285) do
+		local v2_315 = v2_314.Primary == true
+		local v2_316 = v2_315 and v0_8.Accent or v0_8.Element
+		local v2_317 = v2_315 and v0_8.Accent:Lerp(v0_8.Text, 0.15) or v0_8.Hover
+		local v2_318 = Instance.new("TextButton")
+		v2_318.Name = "Button"
+		v2_318.Size = UDim2.new(0, 0, 0, 30)
+		v2_318.AutomaticSize = Enum.AutomaticSize.X
+		v2_318.BackgroundColor3 = v2_316
+		v2_318.BorderSizePixel = 0
+		v2_318.Text = self:T(tostring(v2_314.Title or "OK"))
+		v2_318.TextColor3 = v0_8.Text
+		v2_318.Font = Enum.Font.Gotham
+		v2_318.TextSize = 13
+		v2_318.AutoButtonColor = false
+		v2_318.LayoutOrder = v2_313
+		v2_318.Parent = v1_306
+		v0_63(v2_318, 6)
+		local v2_319 = Instance.new("UIPadding")
+		v2_319.PaddingLeft = UDim.new(0, 14)
+		v2_319.PaddingRight = UDim.new(0, 14)
+		v2_319.Parent = v2_318
+		v0_21(v2_318, v2_316, v2_317)
+		v2_318.MouseButton1Click:Connect(function()
+			if v1_286 then return end
+			v1_308()
+			if v2_314.Callback then v2_314.Callback() end
+		end)
+	end
+	v1_290.MouseButton1Click:Connect(function()
+		if v1_288.Dismissable then v1_308() end
 	end)
-	v1_287.InputEnded:Connect(function(v2_292)
-		if v0_19(v2_292) then v0_12(v1_290, { Scale = 1.1 }, 0.15, Enum.EasingStyle.Back) end
+	table.insert(self._dialogs, v1_288)
+	v1_287 = {
+		v0_12(v1_290, { BackgroundTransparency = 0.45 }, 0.2),
+		v0_12(v1_291, { GroupTransparency = 0 }, 0.22),
+		v0_12(v1_293, { Scale = 1 }, 0.3, Enum.EasingStyle.Back),
+	}
+	return { Close = v1_308 }
+end
+function v0_1:_buildWatermark(v1_320)
+	local v1_321 = Instance.new("Frame")
+	v1_321.Name = "Watermark"
+	v1_321.AnchorPoint = Vector2.new(0.5, 0)
+	v1_321.Position = UDim2.new(0.5, 0, 0, -40)
+	v1_321.Size = UDim2.new(0, 0, 0, 30)
+	v1_321.AutomaticSize = Enum.AutomaticSize.X
+	v1_321.BackgroundColor3 = v0_8.Sidebar
+	v1_321.BorderSizePixel = 0
+	v1_321.Parent = self.ScreenGui
+	v0_63(v1_321, 8)
+	local v1_322 = Instance.new("UIStroke")
+	v1_322.Color = v0_8.Element
+	v1_322.Thickness = 1
+	v1_322.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	v1_322.Parent = v1_321
+	local v1_323 = Instance.new("UIPadding")
+	v1_323.PaddingLeft = UDim.new(0, 10)
+	v1_323.PaddingRight = UDim.new(0, 4)
+	v1_323.Parent = v1_321
+	local v1_324 = Instance.new("UIListLayout")
+	v1_324.FillDirection = Enum.FillDirection.Horizontal
+	v1_324.VerticalAlignment = Enum.VerticalAlignment.Center
+	v1_324.Padding = UDim.new(0, 8)
+	v1_324.SortOrder = Enum.SortOrder.LayoutOrder
+	v1_324.Parent = v1_321
+	local v1_325 = Instance.new("TextLabel")
+	v1_325.Name = "Title"
+	v1_325.Size = UDim2.new(0, 0, 1, 0)
+	v1_325.AutomaticSize = Enum.AutomaticSize.X
+	v1_325.BackgroundTransparency = 1
+	v1_325.BorderSizePixel = 0
+	self:_track(v1_325, "Text", v1_320)
+	v1_325.TextColor3 = v0_8.SubText
+	v1_325.Font = Enum.Font.GothamBold
+	v1_325.TextSize = 13
+	v1_325.LayoutOrder = 1
+	v1_325.Parent = v1_321
+	local v1_326 = Instance.new("TextButton")
+	v1_326.Name = "ToggleButton"
+	v1_326.Size = UDim2.new(0, 22, 0, 22)
+	v1_326.BackgroundColor3 = v0_8.Element
+	v1_326.BorderSizePixel = 0
+	v1_326.Text = ""
+	v1_326.AutoButtonColor = false
+	v1_326.LayoutOrder = 2
+	v1_326.Parent = v1_321
+	v0_63(v1_326, 6)
+	local v1_327 = Instance.new("ImageLabel")
+	v1_327.Name = "Icon"
+	v1_327.AnchorPoint = Vector2.new(0.5, 0.5)
+	v1_327.Position = UDim2.new(0.5, 0, 0.5, 0)
+	v1_327.Size = UDim2.new(0, 14, 0, 14)
+	v1_327.BackgroundTransparency = 1
+	v1_327.BorderSizePixel = 0
+	v1_327.ImageColor3 = v0_8.IconOn
+	v1_327.ScaleType = Enum.ScaleType.Fit
+	v1_327.Parent = v1_326
+	local v1_328 = Instance.new("TextLabel")
+	v1_328.Name = "IconFallback"
+	v1_328.Size = UDim2.new(1, 0, 1, 0)
+	v1_328.BackgroundTransparency = 1
+	v1_328.TextColor3 = v0_8.IconOn
+	v1_328.Font = Enum.Font.GothamBold
+	v1_328.TextSize = 12
+	v1_328.Visible = false
+	v1_328.Parent = v1_327
+	local v1_329 = Instance.new("UIScale")
+	v1_329.Parent = v1_326
+	v1_326.MouseEnter:Connect(function() v0_12(v1_329, { Scale = 1.1 }, 0.12) end)
+	v1_326.MouseLeave:Connect(function() v0_12(v1_329, { Scale = 1 }, 0.12) end)
+	v1_326.InputBegan:Connect(function(v2_330)
+		if v0_19(v2_330) then v0_12(v1_329, { Scale = 0.9 }, 0.08) end
 	end)
-	v1_287.MouseButton1Click:Connect(function()
+	v1_326.InputEnded:Connect(function(v2_331)
+		if v0_19(v2_331) then v0_12(v1_329, { Scale = 1.1 }, 0.15, Enum.EasingStyle.Back) end
+	end)
+	v1_326.MouseButton1Click:Connect(function()
 		self:Toggle()
 	end)
-	local v1_293, v1_294, v1_295 = false, nil, nil
-	v1_286.InputBegan:Connect(function(v2_296)
-		if v0_19(v2_296) then
-			v1_293 = true
-			v1_294 = v2_296.Position
-			v1_295 = v1_282.AbsolutePosition + Vector2.new(v1_282.AbsoluteSize.X / 2, 0)
-			v2_296.Changed:Connect(function()
-				if v2_296.UserInputState == Enum.UserInputState.End then v1_293 = false end
+	local v1_332, v1_333, v1_334 = false, nil, nil
+	v1_325.InputBegan:Connect(function(v2_335)
+		if v0_19(v2_335) then
+			v1_332 = true
+			v1_333 = v2_335.Position
+			v1_334 = v1_321.AbsolutePosition + Vector2.new(v1_321.AbsoluteSize.X / 2, 0)
+			v2_335.Changed:Connect(function()
+				if v2_335.UserInputState == Enum.UserInputState.End then v1_332 = false end
 			end)
 		end
 	end)
-	table.insert(self._connections, v0_4.InputChanged:Connect(function(v2_297)
-		if not v1_293 then return end
-		if v2_297.UserInputType ~= Enum.UserInputType.MouseMovement and v2_297.UserInputType ~= Enum.UserInputType.Touch then
+	table.insert(self._connections, v0_4.InputChanged:Connect(function(v2_336)
+		if not v1_332 then return end
+		if v2_336.UserInputType ~= Enum.UserInputType.MouseMovement and v2_336.UserInputType ~= Enum.UserInputType.Touch then
 			return
 		end
-		local v2_298 = v2_297.Position - v1_294
-		local v2_299 = self.ScreenGui.AbsoluteSize
-		local v2_300 = v1_282.AbsoluteSize.X / 2
-		local v2_301 = math.clamp(v1_295.X + v2_298.X, v2_300, math.max(v2_299.X - v2_300, v2_300))
-		local v2_302 = math.clamp(v1_295.Y + v2_298.Y, 0, math.max(v2_299.Y - v1_282.AbsoluteSize.Y, 0))
-		v1_282.Position = UDim2.fromOffset(v2_301, v2_302)
+		local v2_337 = v2_336.Position - v1_333
+		local v2_338 = self.ScreenGui.AbsoluteSize
+		local v2_339 = v1_321.AbsoluteSize.X / 2
+		local v2_340 = math.clamp(v1_334.X + v2_337.X, v2_339, math.max(v2_338.X - v2_339, v2_339))
+		local v2_341 = math.clamp(v1_334.Y + v2_337.Y, 0, math.max(v2_338.Y - v1_321.AbsoluteSize.Y, 0))
+		v1_321.Position = UDim2.fromOffset(v2_340, v2_341)
 	end))
-	self._wm = { Frame = v1_282, Button = v1_287, Icon = v1_288, Fallback = v1_289 }
-	v0_12(v1_282, { Position = UDim2.new(0.5, 0, 0, 10) }, 0.5, Enum.EasingStyle.Back)
+	self._wm = { Frame = v1_321, Button = v1_326, Icon = v1_327, Fallback = v1_328 }
+	v0_12(v1_321, { Position = UDim2.new(0.5, 0, 0, 10) }, 0.5, Enum.EasingStyle.Back)
 end
 function v0_1:_updateWatermark()
-	local v1_303 = self._wm
-	if not v1_303 then return end
-	local v1_304 = self._visible == true
-	v0_12(v1_303.Button, { BackgroundColor3 = v1_304 and v0_8.Accent or v0_8.Element }, 0.2)
-	local v1_305 = v0_44(v1_303.Icon, v1_304 and "eye" or "eye-off", self.Icons)
-	if not v1_305 then v1_303.Icon.Image = "" end
-	v1_303.Fallback.Visible = not v1_305
-	v1_303.Fallback.Text = v1_304 and "●" or "○"
-	v1_303.Icon.ImageTransparency = 1
-	v0_12(v1_303.Icon, { ImageTransparency = 0 }, 0.2)
+	local v1_342 = self._wm
+	if not v1_342 then return end
+	local v1_343 = self._visible == true
+	v0_12(v1_342.Button, { BackgroundColor3 = v1_343 and v0_8.Accent or v0_8.Element }, 0.2)
+	local v1_344 = v0_44(v1_342.Icon, v1_343 and "eye" or "eye-off", self.Icons)
+	if not v1_344 then v1_342.Icon.Image = "" end
+	v1_342.Fallback.Visible = not v1_344
+	v1_342.Fallback.Text = v1_343 and "●" or "○"
+	v1_342.Icon.ImageTransparency = 1
+	v0_12(v1_342.Icon, { ImageTransparency = 0 }, 0.2)
 end
-local function v0_306(v1_307, v1_308)
-	local v1_309 = v1_307.Glow
-	if not v1_309 then return end
-	for v2_310, v2_311 in ipairs(v1_309.Layers) do
-		v0_12(v2_311.Obj, { [v2_311.Prop] = v1_308 and v2_311.On or 1 }, 0.25, Enum.EasingStyle.Quad)
+local function v0_345(v1_346, v1_347)
+	local v1_348 = v1_346.Glow
+	if not v1_348 then return end
+	for v2_349, v2_350 in ipairs(v1_348.Layers) do
+		v0_12(v2_350.Obj, { [v2_350.Prop] = v1_347 and v2_350.On or 1 }, 0.25, Enum.EasingStyle.Quad)
 	end
 end
-local function v0_312(v1_313, v1_314)
-	v0_12(v1_313.Icon, { ImageColor3 = v1_314 }, 0.2)
-	if v1_313.Fallback then
-		v0_12(v1_313.Fallback, { TextColor3 = v1_314 }, 0.2)
+local function v0_351(v1_352, v1_353)
+	v0_12(v1_352.Icon, { ImageColor3 = v1_353 }, 0.2)
+	if v1_352.Fallback then
+		v0_12(v1_352.Fallback, { TextColor3 = v1_353 }, 0.2)
 	end
 end
-function v0_1:AddTab(v1_315)
-	v1_315 = v1_315 or {}
-	local v1_316 = Instance.new("TextButton")
-	v1_316.Name = "TabButton"
-	v1_316.Size = UDim2.new(0, 36, 0, 36)
-	v1_316.BackgroundColor3 = v0_8.Card
-	v1_316.BorderSizePixel = 0
-	v1_316.Text = ""
-	v1_316.AutoButtonColor = false
-	v1_316.LayoutOrder = #self.Tabs + 1
-	v1_316.Parent = self.Sidebar
-	v0_63(v1_316, 6)
-	local v1_317 = Instance.new("ImageLabel")
-	v1_317.Name = "Icon"
-	v1_317.AnchorPoint = Vector2.new(0.5, 0.5)
-	v1_317.Size = UDim2.new(0, 20, 0, 20)
-	v1_317.Position = UDim2.new(0.5, 0, 0.5, 0)
-	v1_317.BackgroundTransparency = 1
-	v1_317.BorderSizePixel = 0
-	v1_317.ImageColor3 = v0_8.IconOff
-	v1_317.ScaleType = Enum.ScaleType.Fit
-	v1_317.Parent = v1_316
-	local v1_318
-	if not v0_44(v1_317, v1_315.Icon, self.Icons) then
-		v1_318 = Instance.new("TextLabel")
-		v1_318.Name = "IconFallback"
-		v1_318.Size = UDim2.new(1, 0, 1, 0)
-		v1_318.BackgroundTransparency = 1
-		v1_318.Text = string.upper(string.sub(tostring(v1_315.Name or v1_315.Icon or "?"), 1, 1))
-		v1_318.TextColor3 = v0_8.IconOff
-		v1_318.Font = Enum.Font.GothamBold
-		v1_318.TextSize = 16
-		v1_318.Parent = v1_317
+function v0_1:AddTab(v1_354)
+	v1_354 = v1_354 or {}
+	local v1_355 = Instance.new("TextButton")
+	v1_355.Name = "TabButton"
+	v1_355.Size = UDim2.new(0, 36, 0, 36)
+	v1_355.BackgroundColor3 = v0_8.Card
+	v1_355.BorderSizePixel = 0
+	v1_355.Text = ""
+	v1_355.AutoButtonColor = false
+	v1_355.LayoutOrder = #self.Tabs + 1
+	v1_355.Parent = self.Sidebar
+	v0_63(v1_355, 6)
+	local v1_356 = Instance.new("ImageLabel")
+	v1_356.Name = "Icon"
+	v1_356.AnchorPoint = Vector2.new(0.5, 0.5)
+	v1_356.Size = UDim2.new(0, 20, 0, 20)
+	v1_356.Position = UDim2.new(0.5, 0, 0.5, 0)
+	v1_356.BackgroundTransparency = 1
+	v1_356.BorderSizePixel = 0
+	v1_356.ImageColor3 = v0_8.IconOff
+	v1_356.ScaleType = Enum.ScaleType.Fit
+	v1_356.Parent = v1_355
+	local v1_357
+	if not v0_44(v1_356, v1_354.Icon, self.Icons) then
+		v1_357 = Instance.new("TextLabel")
+		v1_357.Name = "IconFallback"
+		v1_357.Size = UDim2.new(1, 0, 1, 0)
+		v1_357.BackgroundTransparency = 1
+		v1_357.Text = string.upper(string.sub(tostring(v1_354.Name or v1_354.Icon or "?"), 1, 1))
+		v1_357.TextColor3 = v0_8.IconOff
+		v1_357.Font = Enum.Font.GothamBold
+		v1_357.TextSize = 16
+		v1_357.Parent = v1_356
 	end
-	local v1_319
+	local v1_358
 	if self.IconGlow then
-		v1_316.BackgroundTransparency = 1
-		v1_317.ZIndex = 2
-		v1_319 = { Layers = {} }
-		if v1_317.Image ~= "" then
-			for v4_320, v4_321 in ipairs({ { 26, 0.55 }, { 33, 0.82 } }) do
-				local v4_322 = Instance.new("ImageLabel")
-				v4_322.Name = "Glow"
-				v4_322.AnchorPoint = Vector2.new(0.5, 0.5)
-				v4_322.Position = UDim2.new(0.5, 0, 0.5, 0)
-				v4_322.Size = UDim2.new(0, v4_321[1], 0, v4_321[1])
-				v4_322.BackgroundTransparency = 1
-				v4_322.BorderSizePixel = 0
-				v4_322.Image = v1_317.Image
-				v4_322.ImageRectSize = v1_317.ImageRectSize
-				v4_322.ImageRectOffset = v1_317.ImageRectOffset
-				v4_322.ImageColor3 = v0_8.Accent
-				v4_322.ImageTransparency = 1
-				v4_322.ScaleType = Enum.ScaleType.Fit
-				v4_322.ZIndex = 1
-				v4_322.Parent = v1_316
-				table.insert(v1_319.Layers, { Obj = v4_322, Prop = "ImageTransparency", On = v4_321[2] })
+		v1_355.BackgroundTransparency = 1
+		v1_356.ZIndex = 2
+		v1_358 = { Layers = {} }
+		if v1_356.Image ~= "" then
+			for v4_359, v4_360 in ipairs({ { 26, 0.55 }, { 33, 0.82 } }) do
+				local v4_361 = Instance.new("ImageLabel")
+				v4_361.Name = "Glow"
+				v4_361.AnchorPoint = Vector2.new(0.5, 0.5)
+				v4_361.Position = UDim2.new(0.5, 0, 0.5, 0)
+				v4_361.Size = UDim2.new(0, v4_360[1], 0, v4_360[1])
+				v4_361.BackgroundTransparency = 1
+				v4_361.BorderSizePixel = 0
+				v4_361.Image = v1_356.Image
+				v4_361.ImageRectSize = v1_356.ImageRectSize
+				v4_361.ImageRectOffset = v1_356.ImageRectOffset
+				v4_361.ImageColor3 = v0_8.Accent
+				v4_361.ImageTransparency = 1
+				v4_361.ScaleType = Enum.ScaleType.Fit
+				v4_361.ZIndex = 1
+				v4_361.Parent = v1_355
+				table.insert(v1_358.Layers, { Obj = v4_361, Prop = "ImageTransparency", On = v4_360[2] })
 			end
-		elseif v1_318 then
-			local v3_323 = Instance.new("UIStroke")
-			v3_323.Color = v0_8.Accent
-			v3_323.Thickness = 1
-			v3_323.Transparency = 1
-			v3_323.Parent = v1_318
-			table.insert(v1_319.Layers, { Obj = v3_323, Prop = "Transparency", On = 0.45 })
+		elseif v1_357 then
+			local v3_362 = Instance.new("UIStroke")
+			v3_362.Color = v0_8.Accent
+			v3_362.Thickness = 1
+			v3_362.Transparency = 1
+			v3_362.Parent = v1_357
+			table.insert(v1_358.Layers, { Obj = v3_362, Prop = "Transparency", On = 0.45 })
 		end
 	end
-	local v1_324 = Instance.new("ScrollingFrame")
-	v1_324.Name = "Page"
-	v1_324.Size = UDim2.new(1, 0, 1, 0)
-	v1_324.BackgroundTransparency = 1
-	v1_324.BorderSizePixel = 0
-	v1_324.ScrollBarThickness = 3
-	v1_324.ScrollBarImageColor3 = v0_8.IconOff
-	v1_324.ScrollingDirection = Enum.ScrollingDirection.Y
-	v1_324.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	v1_324.CanvasSize = UDim2.new(0, 0, 0, 0)
-	v1_324.Visible = false
-	v1_324.Parent = self.Content
-	local v1_325 = Instance.new("Frame")
-	v1_325.Name = "Inner"
-	v1_325.Size = UDim2.new(1, 0, 0, 0)
-	v1_325.AutomaticSize = Enum.AutomaticSize.Y
-	v1_325.BackgroundTransparency = 1
-	v1_325.BorderSizePixel = 0
-	v1_325.Parent = v1_324
-	local v1_326 = Instance.new("UIPadding")
-	v1_326.PaddingTop = UDim.new(0, 12)
-	v1_326.PaddingBottom = UDim.new(0, 12)
-	v1_326.Parent = v1_325
-	local v1_327 = Instance.new("Frame")
-	v1_327.Name = "Split"
-	v1_327.Position = UDim2.new(0, 12, 0, 0)
-	v1_327.Size = UDim2.new(1, -26, 0, 0)
-	v1_327.AutomaticSize = Enum.AutomaticSize.Y
-	v1_327.BackgroundTransparency = 1
-	v1_327.BorderSizePixel = 0
-	v1_327.Parent = v1_325
-	local v1_328 = Instance.new("UIListLayout")
-	v1_328.FillDirection = Enum.FillDirection.Horizontal
-	v1_328.Padding = UDim.new(0, 8)
-	v1_328.SortOrder = Enum.SortOrder.LayoutOrder
-	v1_328.Parent = v1_327
-	local function v1_329(v2_330)
-		local v2_331 = Instance.new("Frame")
-		v2_331.Name = v2_330 == 1 and "Left" or "Right"
-		v2_331.Size = UDim2.new(0.5, -4, 0, 0)
-		v2_331.AutomaticSize = Enum.AutomaticSize.Y
-		v2_331.BackgroundTransparency = 1
-		v2_331.BorderSizePixel = 0
-		v2_331.LayoutOrder = v2_330
-		v2_331.Parent = v1_327
-		local v2_332 = Instance.new("UIListLayout")
-		v2_332.Padding = UDim.new(0, 8)
-		v2_332.SortOrder = Enum.SortOrder.LayoutOrder
-		v2_332.Parent = v2_331
-		return v2_331
+	local v1_363 = Instance.new("ScrollingFrame")
+	v1_363.Name = "Page"
+	v1_363.Size = UDim2.new(1, 0, 1, 0)
+	v1_363.BackgroundTransparency = 1
+	v1_363.BorderSizePixel = 0
+	v1_363.ScrollBarThickness = 3
+	v1_363.ScrollBarImageColor3 = v0_8.IconOff
+	v1_363.ScrollingDirection = Enum.ScrollingDirection.Y
+	v1_363.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	v1_363.CanvasSize = UDim2.new(0, 0, 0, 0)
+	v1_363.Visible = false
+	v1_363.Parent = self.Content
+	local v1_364 = Instance.new("Frame")
+	v1_364.Name = "Inner"
+	v1_364.Size = UDim2.new(1, 0, 0, 0)
+	v1_364.AutomaticSize = Enum.AutomaticSize.Y
+	v1_364.BackgroundTransparency = 1
+	v1_364.BorderSizePixel = 0
+	v1_364.Parent = v1_363
+	local v1_365 = Instance.new("UIPadding")
+	v1_365.PaddingTop = UDim.new(0, 12)
+	v1_365.PaddingBottom = UDim.new(0, 12)
+	v1_365.Parent = v1_364
+	local v1_366 = Instance.new("Frame")
+	v1_366.Name = "Split"
+	v1_366.Position = UDim2.new(0, 12, 0, 0)
+	v1_366.Size = UDim2.new(1, -26, 0, 0)
+	v1_366.AutomaticSize = Enum.AutomaticSize.Y
+	v1_366.BackgroundTransparency = 1
+	v1_366.BorderSizePixel = 0
+	v1_366.Parent = v1_364
+	local v1_367 = Instance.new("UIListLayout")
+	v1_367.FillDirection = Enum.FillDirection.Horizontal
+	v1_367.Padding = UDim.new(0, 8)
+	v1_367.SortOrder = Enum.SortOrder.LayoutOrder
+	v1_367.Parent = v1_366
+	local function v1_368(v2_369)
+		local v2_370 = Instance.new("Frame")
+		v2_370.Name = v2_369 == 1 and "Left" or "Right"
+		v2_370.Size = UDim2.new(0.5, -4, 0, 0)
+		v2_370.AutomaticSize = Enum.AutomaticSize.Y
+		v2_370.BackgroundTransparency = 1
+		v2_370.BorderSizePixel = 0
+		v2_370.LayoutOrder = v2_369
+		v2_370.Parent = v1_366
+		local v2_371 = Instance.new("UIListLayout")
+		v2_371.Padding = UDim.new(0, 8)
+		v2_371.SortOrder = Enum.SortOrder.LayoutOrder
+		v2_371.Parent = v2_370
+		return v2_370
 	end
-	local v1_333 = setmetatable({
-		Page = v1_324,
-		Button = v1_316,
-		Icon = v1_317,
-		Fallback = v1_318,
-		Glow = v1_319,
-		Inner = v1_325,
+	local v1_372 = setmetatable({
+		Page = v1_363,
+		Button = v1_355,
+		Icon = v1_356,
+		Fallback = v1_357,
+		Glow = v1_358,
+		Inner = v1_364,
 		_icons = self.Icons,
 		_lib = self,
-		Left = v1_329(1),
-		Right = v1_329(2),
+		Left = v1_368(1),
+		Right = v1_368(2),
 		_sectionCount = 0,
 	}, v0_2)
-	table.insert(self.Tabs, v1_333)
-	for v2_334, v2_335 in ipairs({ "CanvasPosition", "AbsoluteCanvasSize", "AbsoluteWindowSize" }) do
-		table.insert(self._connections, v1_324:GetPropertyChangedSignal(v2_335):Connect(function()
-			if self.ActiveTab == v1_333 then self:_updateScrollHint() end
+	table.insert(self.Tabs, v1_372)
+	for v2_373, v2_374 in ipairs({ "CanvasPosition", "AbsoluteCanvasSize", "AbsoluteWindowSize" }) do
+		table.insert(self._connections, v1_363:GetPropertyChangedSignal(v2_374):Connect(function()
+			if self.ActiveTab == v1_372 then self:_updateScrollHint() end
 		end))
 	end
 	if self.IconGlow then
-		v1_316.MouseEnter:Connect(function()
-			if self.ActiveTab ~= v1_333 then v0_312(v1_333, v0_8.SubText) end
+		v1_355.MouseEnter:Connect(function()
+			if self.ActiveTab ~= v1_372 then v0_351(v1_372, v0_8.SubText) end
 		end)
-		v1_316.MouseLeave:Connect(function()
-			if self.ActiveTab ~= v1_333 then v0_312(v1_333, v0_8.IconOff) end
+		v1_355.MouseLeave:Connect(function()
+			if self.ActiveTab ~= v1_372 then v0_351(v1_372, v0_8.IconOff) end
 		end)
 	end
-	v0_21(v1_316, v0_8.Card, v0_8.Element, function()
-		return self.ActiveTab == v1_333
+	v0_21(v1_355, v0_8.Card, v0_8.Element, function()
+		return self.ActiveTab == v1_372
 	end)
-	v1_316.MouseButton1Click:Connect(function()
-		self:SelectTab(v1_333)
+	v1_355.MouseButton1Click:Connect(function()
+		self:SelectTab(v1_372)
 	end)
-	if not self.ActiveTab then self:SelectTab(v1_333) end
-	return v1_333
+	if not self.ActiveTab then self:SelectTab(v1_372) end
+	return v1_372
 end
-function v0_1:SelectTab(v1_336)
-	if self.ActiveTab == v1_336 then return end
-	local v1_337 = self.ActiveTab
-	self.ActiveTab = v1_336
-	if v1_337 then
-		v1_337.Page.Visible = false
+function v0_1:SelectTab(v1_375)
+	if self.ActiveTab == v1_375 then return end
+	local v1_376 = self.ActiveTab
+	self.ActiveTab = v1_375
+	if v1_376 then
+		v1_376.Page.Visible = false
 		if self.IconGlow then
-			v0_306(v1_337, false)
+			v0_345(v1_376, false)
 		else
-			v0_12(v1_337.Button, { BackgroundColor3 = v0_8.Card }, 0.2)
+			v0_12(v1_376.Button, { BackgroundColor3 = v0_8.Card }, 0.2)
 		end
-		v0_312(v1_337, v0_8.IconOff)
+		v0_351(v1_376, v0_8.IconOff)
 	end
-	v1_336.Inner.Position = UDim2.new(0, 0, 0, 14)
-	v1_336.Page.Visible = true
-	v0_12(v1_336.Inner, { Position = UDim2.new(0, 0, 0, 0) }, 0.3, Enum.EasingStyle.Quint)
+	v1_375.Inner.Position = UDim2.new(0, 0, 0, 14)
+	v1_375.Page.Visible = true
+	v0_12(v1_375.Inner, { Position = UDim2.new(0, 0, 0, 0) }, 0.3, Enum.EasingStyle.Quint)
 	if self.IconGlow then
-		v0_306(v1_336, true)
+		v0_345(v1_375, true)
 	else
-		v0_12(v1_336.Button, { BackgroundColor3 = v0_8.Accent }, 0.2)
+		v0_12(v1_375.Button, { BackgroundColor3 = v0_8.Accent }, 0.2)
 	end
-	v0_312(v1_336, v0_8.IconOn)
+	v0_351(v1_375, v0_8.IconOn)
 	self:_updateScrollHint()
 end
-function v0_2:AddSection(v1_338, v1_339, v1_340)
-	local v1_341 = (v1_339 == "right") and self.Right or self.Left
-	local v1_342 = self._lib
+function v0_2:AddSection(v1_377, v1_378, v1_379)
+	local v1_380 = (v1_378 == "right") and self.Right or self.Left
+	local v1_381 = self._lib
 	self._sectionCount += 1
-	local v1_343 = Instance.new("Frame")
-	v1_343.Name = "Section"
-	v1_343.Size = UDim2.new(1, 0, 0, 0)
-	v1_343.AutomaticSize = Enum.AutomaticSize.Y
-	v1_343.BackgroundColor3 = v0_8.Card
-	v1_343.BorderSizePixel = 0
-	v1_343.LayoutOrder = self._sectionCount
-	v1_343.Parent = v1_341
-	v0_63(v1_343, 6)
-	local v1_344 = Instance.new("UIPadding")
-	v1_344.PaddingTop = UDim.new(0, 8)
-	v1_344.PaddingBottom = UDim.new(0, 8)
-	v1_344.PaddingLeft = UDim.new(0, 8)
-	v1_344.PaddingRight = UDim.new(0, 8)
-	v1_344.Parent = v1_343
-	local v1_345 = Instance.new("UIListLayout")
-	v1_345.Padding = UDim.new(0, 6)
-	v1_345.SortOrder = Enum.SortOrder.LayoutOrder
-	v1_345.Parent = v1_343
-	local v1_346 = Instance.new("Frame")
-	v1_346.Name = "Body"
-	v1_346.Size = UDim2.new(1, 0, 0, 0)
-	v1_346.AutomaticSize = Enum.AutomaticSize.Y
-	v1_346.BackgroundTransparency = 1
-	v1_346.BorderSizePixel = 0
-	v1_346.LayoutOrder = 1
-	v1_346.Parent = v1_343
-	local v1_347 = Instance.new("UIListLayout")
-	v1_347.Padding = UDim.new(0, 6)
-	v1_347.SortOrder = Enum.SortOrder.LayoutOrder
-	v1_347.Parent = v1_346
-	local v1_348 = false
-	local v1_349 = {}
-	local v1_350, v1_351
-	local function v1_352()
-		local v2_353 = v1_342._scale and v1_342._scale.Scale or 1
-		return math.max(v1_347.AbsoluteContentSize.Y / (v2_353 > 0 and v2_353 or 1), 0)
+	local v1_382 = Instance.new("Frame")
+	v1_382.Name = "Section"
+	v1_382.Size = UDim2.new(1, 0, 0, 0)
+	v1_382.AutomaticSize = Enum.AutomaticSize.Y
+	v1_382.BackgroundColor3 = v0_8.Card
+	v1_382.BorderSizePixel = 0
+	v1_382.LayoutOrder = self._sectionCount
+	v1_382.Parent = v1_380
+	v0_63(v1_382, 6)
+	local v1_383 = Instance.new("UIPadding")
+	v1_383.PaddingTop = UDim.new(0, 8)
+	v1_383.PaddingBottom = UDim.new(0, 8)
+	v1_383.PaddingLeft = UDim.new(0, 8)
+	v1_383.PaddingRight = UDim.new(0, 8)
+	v1_383.Parent = v1_382
+	local v1_384 = Instance.new("UIListLayout")
+	v1_384.Padding = UDim.new(0, 6)
+	v1_384.SortOrder = Enum.SortOrder.LayoutOrder
+	v1_384.Parent = v1_382
+	local v1_385 = Instance.new("Frame")
+	v1_385.Name = "Body"
+	v1_385.Size = UDim2.new(1, 0, 0, 0)
+	v1_385.AutomaticSize = Enum.AutomaticSize.Y
+	v1_385.BackgroundTransparency = 1
+	v1_385.BorderSizePixel = 0
+	v1_385.LayoutOrder = 1
+	v1_385.Parent = v1_382
+	local v1_386 = Instance.new("UIListLayout")
+	v1_386.Padding = UDim.new(0, 6)
+	v1_386.SortOrder = Enum.SortOrder.LayoutOrder
+	v1_386.Parent = v1_385
+	local v1_387 = false
+	local v1_388 = {}
+	local v1_389, v1_390
+	local function v1_391()
+		local v2_392 = v1_381._scale and v1_381._scale.Scale or 1
+		return math.max(v1_386.AbsoluteContentSize.Y / (v2_392 > 0 and v2_392 or 1), 0)
 	end
-	local function v1_354()
-		v1_346.AutomaticSize = Enum.AutomaticSize.Y
-		v1_346.Size = UDim2.new(1, 0, 0, 0)
-		v1_346.ClipsDescendants = false
+	local function v1_393()
+		v1_385.AutomaticSize = Enum.AutomaticSize.Y
+		v1_385.Size = UDim2.new(1, 0, 0, 0)
+		v1_385.ClipsDescendants = false
 	end
-	local function v1_355(v2_356, v2_357)
-		if v2_356 == v1_348 and not v2_357 then return end
-		v1_348 = v2_356
-		for v3_358, v3_359 in ipairs(v1_349) do v3_359:Cancel() end
-		v1_349 = {}
-		if v1_350 then
-			if v2_357 then
-				v1_350.Rotation = v2_356 and -90 or 0
+	local function v1_394(v2_395, v2_396)
+		if v2_395 == v1_387 and not v2_396 then return end
+		v1_387 = v2_395
+		for v3_397, v3_398 in ipairs(v1_388) do v3_398:Cancel() end
+		v1_388 = {}
+		if v1_389 then
+			if v2_396 then
+				v1_389.Rotation = v2_395 and -90 or 0
 			else
-				v0_12(v1_350, { Rotation = v2_356 and -90 or 0 }, 0.22, Enum.EasingStyle.Quint)
+				v0_12(v1_389, { Rotation = v2_395 and -90 or 0 }, 0.22, Enum.EasingStyle.Quint)
 			end
 		end
-		if v2_357 then
-			v1_346.Visible = not v2_356
-			v1_345.Padding = UDim.new(0, v2_356 and 0 or 6)
-			v1_354()
+		if v2_396 then
+			v1_385.Visible = not v2_395
+			v1_384.Padding = UDim.new(0, v2_395 and 0 or 6)
+			v1_393()
 			return
 		end
-		v1_346.ClipsDescendants = true
-		if v2_356 then
-			if v1_346.AutomaticSize ~= Enum.AutomaticSize.None then
-				local v4_360 = v1_352()
-				v1_346.AutomaticSize = Enum.AutomaticSize.None
-				v1_346.Size = UDim2.new(1, 0, 0, v4_360)
+		v1_385.ClipsDescendants = true
+		if v2_395 then
+			if v1_385.AutomaticSize ~= Enum.AutomaticSize.None then
+				local v4_399 = v1_391()
+				v1_385.AutomaticSize = Enum.AutomaticSize.None
+				v1_385.Size = UDim2.new(1, 0, 0, v4_399)
 			end
-			local v3_361 = v0_12(v1_346, { Size = UDim2.new(1, 0, 0, 0) }, 0.25, Enum.EasingStyle.Quint)
-			v1_349 = { v3_361, v0_12(v1_345, { Padding = UDim.new(0, 0) }, 0.25, Enum.EasingStyle.Quint) }
-			v3_361.Completed:Connect(function(v4_362)
-				if v4_362 == Enum.PlaybackState.Completed and v1_348 then
-					v1_346.Visible = false
-					v1_346.ClipsDescendants = false
+			local v3_400 = v0_12(v1_385, { Size = UDim2.new(1, 0, 0, 0) }, 0.25, Enum.EasingStyle.Quint)
+			v1_388 = { v3_400, v0_12(v1_384, { Padding = UDim.new(0, 0) }, 0.25, Enum.EasingStyle.Quint) }
+			v3_400.Completed:Connect(function(v4_401)
+				if v4_401 == Enum.PlaybackState.Completed and v1_387 then
+					v1_385.Visible = false
+					v1_385.ClipsDescendants = false
 				end
 			end)
 		else
-			v1_346.Visible = true
-			local v3_363 = v1_352()
-			if v3_363 <= 0 then
-				v1_345.Padding = UDim.new(0, 6)
-				v1_354()
+			v1_385.Visible = true
+			local v3_402 = v1_391()
+			if v3_402 <= 0 then
+				v1_384.Padding = UDim.new(0, 6)
+				v1_393()
 				return
 			end
-			if v1_346.AutomaticSize ~= Enum.AutomaticSize.None then
-				v1_346.AutomaticSize = Enum.AutomaticSize.None
-				v1_346.Size = UDim2.new(1, 0, 0, 0)
+			if v1_385.AutomaticSize ~= Enum.AutomaticSize.None then
+				v1_385.AutomaticSize = Enum.AutomaticSize.None
+				v1_385.Size = UDim2.new(1, 0, 0, 0)
 			end
-			local v3_364 = v0_12(v1_346, { Size = UDim2.new(1, 0, 0, v3_363) }, 0.28, Enum.EasingStyle.Quint)
-			v1_349 = { v3_364, v0_12(v1_345, { Padding = UDim.new(0, 6) }, 0.28, Enum.EasingStyle.Quint) }
-			v3_364.Completed:Connect(function(v4_365)
-				if v4_365 == Enum.PlaybackState.Completed and not v1_348 then
-					v1_354()
+			local v3_403 = v0_12(v1_385, { Size = UDim2.new(1, 0, 0, v3_402) }, 0.28, Enum.EasingStyle.Quint)
+			v1_388 = { v3_403, v0_12(v1_384, { Padding = UDim.new(0, 6) }, 0.28, Enum.EasingStyle.Quint) }
+			v3_403.Completed:Connect(function(v4_404)
+				if v4_404 == Enum.PlaybackState.Completed and not v1_387 then
+					v1_393()
 				end
 			end)
 		end
 	end
-	if v1_338 then
-		local v2_366 = Instance.new("TextButton")
-		v2_366.Name = "Header"
-		v2_366.Size = UDim2.new(1, 0, 0, 16)
-		v2_366.BackgroundTransparency = 1
-		v2_366.BorderSizePixel = 0
-		v2_366.Text = ""
-		v2_366.AutoButtonColor = false
-		v2_366.LayoutOrder = 0
-		v2_366.Parent = v1_343
-		local v2_367 = Instance.new("TextLabel")
-		v2_367.Name = "Title"
-		v2_367.Size = UDim2.new(1, -22, 1, 0)
-		v2_367.BackgroundTransparency = 1
-		v2_367.BorderSizePixel = 0
-		v2_367.Text = v1_338
-		v2_367.TextColor3 = v0_8.SubText
-		v2_367.Font = Enum.Font.GothamBold
-		v2_367.TextSize = 13
-		v2_367.TextXAlignment = Enum.TextXAlignment.Left
-		v2_367.TextTruncate = Enum.TextTruncate.AtEnd
-		v2_367.Parent = v2_366
-		v1_350 = Instance.new("ImageLabel")
-		v1_350.Name = "Chevron"
-		v1_350.AnchorPoint = Vector2.new(1, 0.5)
-		v1_350.Position = UDim2.new(1, 0, 0.5, 0)
-		v1_350.Size = UDim2.new(0, 14, 0, 14)
-		v1_350.BackgroundTransparency = 1
-		v1_350.BorderSizePixel = 0
-		v1_350.ImageColor3 = v0_8.SubText
-		v1_350.ScaleType = Enum.ScaleType.Fit
-		v1_350.Parent = v2_366
-		v1_351 = Instance.new("TextLabel")
-		v1_351.Name = "ChevronFallback"
-		v1_351.Size = UDim2.new(1, 0, 1, 0)
-		v1_351.BackgroundTransparency = 1
-		v1_351.Text = "▼"
-		v1_351.TextColor3 = v0_8.SubText
-		v1_351.Font = Enum.Font.Gotham
-		v1_351.TextSize = 9
-		v1_351.Parent = v1_350
-		v1_351.Visible = not v0_44(v1_350, "chevron-down", self._icons)
-		v2_366.MouseEnter:Connect(function()
-			v0_12(v2_367, { TextColor3 = v0_8.Text }, 0.12)
-			v0_12(v1_350, { ImageColor3 = v0_8.Text }, 0.12)
-			v0_12(v1_351, { TextColor3 = v0_8.Text }, 0.12)
+	if v1_377 then
+		local v2_405 = Instance.new("TextButton")
+		v2_405.Name = "Header"
+		v2_405.Size = UDim2.new(1, 0, 0, 16)
+		v2_405.BackgroundTransparency = 1
+		v2_405.BorderSizePixel = 0
+		v2_405.Text = ""
+		v2_405.AutoButtonColor = false
+		v2_405.LayoutOrder = 0
+		v2_405.Parent = v1_382
+		local v2_406 = Instance.new("TextLabel")
+		v2_406.Name = "Title"
+		v2_406.Size = UDim2.new(1, -22, 1, 0)
+		v2_406.BackgroundTransparency = 1
+		v2_406.BorderSizePixel = 0
+		v1_381:_track(v2_406, "Text", v1_377)
+		v2_406.TextColor3 = v0_8.SubText
+		v2_406.Font = Enum.Font.GothamBold
+		v2_406.TextSize = 13
+		v2_406.TextXAlignment = Enum.TextXAlignment.Left
+		v2_406.TextTruncate = Enum.TextTruncate.AtEnd
+		v2_406.Parent = v2_405
+		v1_389 = Instance.new("ImageLabel")
+		v1_389.Name = "Chevron"
+		v1_389.AnchorPoint = Vector2.new(1, 0.5)
+		v1_389.Position = UDim2.new(1, 0, 0.5, 0)
+		v1_389.Size = UDim2.new(0, 14, 0, 14)
+		v1_389.BackgroundTransparency = 1
+		v1_389.BorderSizePixel = 0
+		v1_389.ImageColor3 = v0_8.SubText
+		v1_389.ScaleType = Enum.ScaleType.Fit
+		v1_389.Parent = v2_405
+		v1_390 = Instance.new("TextLabel")
+		v1_390.Name = "ChevronFallback"
+		v1_390.Size = UDim2.new(1, 0, 1, 0)
+		v1_390.BackgroundTransparency = 1
+		v1_390.Text = "▼"
+		v1_390.TextColor3 = v0_8.SubText
+		v1_390.Font = Enum.Font.Gotham
+		v1_390.TextSize = 9
+		v1_390.Parent = v1_389
+		v1_390.Visible = not v0_44(v1_389, "chevron-down", self._icons)
+		v2_405.MouseEnter:Connect(function()
+			v0_12(v2_406, { TextColor3 = v0_8.Text }, 0.12)
+			v0_12(v1_389, { ImageColor3 = v0_8.Text }, 0.12)
+			v0_12(v1_390, { TextColor3 = v0_8.Text }, 0.12)
 		end)
-		v2_366.MouseLeave:Connect(function()
-			v0_12(v2_367, { TextColor3 = v0_8.SubText }, 0.15)
-			v0_12(v1_350, { ImageColor3 = v0_8.SubText }, 0.15)
-			v0_12(v1_351, { TextColor3 = v0_8.SubText }, 0.15)
+		v2_405.MouseLeave:Connect(function()
+			v0_12(v2_406, { TextColor3 = v0_8.SubText }, 0.15)
+			v0_12(v1_389, { ImageColor3 = v0_8.SubText }, 0.15)
+			v0_12(v1_390, { TextColor3 = v0_8.SubText }, 0.15)
 		end)
-		v2_366.MouseButton1Click:Connect(function()
-			v1_355(not v1_348)
+		v2_405.MouseButton1Click:Connect(function()
+			v1_394(not v1_387)
 		end)
 	end
-	local v1_368 = setmetatable({
-		Holder = v1_346,
-		Card = v1_343,
+	local v1_407 = setmetatable({
+		Holder = v1_385,
+		Card = v1_382,
 		_count = 0,
 		_icons = self._icons,
 		_lib = self._lib,
-		_setCollapsed = v1_355,
-		_isCollapsed = function() return v1_348 end,
+		_setCollapsed = v1_394,
+		_isCollapsed = function() return v1_387 end,
 	}, v0_3)
-	if v1_338 and v1_340 == true then
-		v1_355(true, true)
+	if v1_377 and v1_379 == true then
+		v1_394(true, true)
 	end
-	return v1_368
+	return v1_407
 end
-function v0_3:SetCollapsed(v1_369)
-	self._setCollapsed(v1_369 == true)
+function v0_3:SetCollapsed(v1_408)
+	self._setCollapsed(v1_408 == true)
 end
 function v0_3:ToggleCollapsed()
 	self._setCollapsed(not self._isCollapsed())
@@ -1615,941 +1714,948 @@ end
 function v0_3:IsCollapsed()
 	return self._isCollapsed()
 end
-local function v0_370(v1_371)
-	if typeof(v1_371) == "EnumItem" and v1_371.EnumType == Enum.KeyCode then return v1_371 end
-	if type(v1_371) == "string" then
-		local v2_372, v2_373 = pcall(function() return Enum.KeyCode[v1_371] end)
-		if v2_372 then return v2_373 end
+local function v0_409(v1_410)
+	if typeof(v1_410) == "EnumItem" and v1_410.EnumType == Enum.KeyCode then return v1_410 end
+	if type(v1_410) == "string" then
+		local v2_411, v2_412 = pcall(function() return Enum.KeyCode[v1_410] end)
+		if v2_411 then return v2_412 end
 	end
 	return nil
 end
-local function v0_374(v1_375, v1_376, v1_377, v1_378, v1_379)
-	v1_377 = v1_377 or {}
-	local v1_380 = v1_377.CanBeChanged ~= false
-	local v1_381 = {}
-	local v1_382 = { _key = nil, _onPress = v1_379, _isListening = false, _destroyed = false }
-	local v1_383 = Instance.new("TextButton")
-	v1_383.Name = "Keybind"
-	v1_383.AnchorPoint = Vector2.new(1, 0.5)
-	v1_383.Position = v1_378
-	v1_383.Size = UDim2.new(0, 0, 0, 20)
-	v1_383.AutomaticSize = Enum.AutomaticSize.X
-	v1_383.BackgroundColor3 = v0_8.Card
-	v1_383.BorderSizePixel = 0
-	v1_383.Text = "None"
-	v1_383.TextColor3 = v0_8.SubText
-	v1_383.Font = Enum.Font.Gotham
-	v1_383.TextSize = 12
-	v1_383.TextTruncate = Enum.TextTruncate.AtEnd
-	v1_383.AutoButtonColor = false
-	v1_383.Parent = v1_376
-	v0_63(v1_383, 5)
-	v1_382.Instance = v1_383
-	local v1_384 = Instance.new("UIPadding")
-	v1_384.PaddingLeft = UDim.new(0, 7)
-	v1_384.PaddingRight = UDim.new(0, 7)
-	v1_384.Parent = v1_383
-	local v1_385 = Instance.new("UISizeConstraint")
-	v1_385.MinSize = Vector2.new(30, 20)
-	v1_385.MaxSize = Vector2.new(96, 20)
-	v1_385.Parent = v1_383
-	local function v1_386()
-		if v1_382._isListening then
-			v1_383.Text = "..."
+local function v0_413(v1_414, v1_415, v1_416, v1_417, v1_418)
+	v1_416 = v1_416 or {}
+	local v1_419 = v1_416.CanBeChanged ~= false
+	local v1_420 = {}
+	local v1_421 = { _key = nil, _onPress = v1_418, _isListening = false, _destroyed = false }
+	local v1_422 = Instance.new("TextButton")
+	v1_422.Name = "Keybind"
+	v1_422.AnchorPoint = Vector2.new(1, 0.5)
+	v1_422.Position = v1_417
+	v1_422.Size = UDim2.new(0, 0, 0, 20)
+	v1_422.AutomaticSize = Enum.AutomaticSize.X
+	v1_422.BackgroundColor3 = v0_8.Card
+	v1_422.BorderSizePixel = 0
+	v1_422.Text = v0_82("None")
+	v1_422.TextColor3 = v0_8.SubText
+	v1_422.Font = Enum.Font.Gotham
+	v1_422.TextSize = 12
+	v1_422.TextTruncate = Enum.TextTruncate.AtEnd
+	v1_422.AutoButtonColor = false
+	v1_422.Parent = v1_415
+	v0_63(v1_422, 5)
+	v1_421.Instance = v1_422
+	local v1_423 = Instance.new("UIPadding")
+	v1_423.PaddingLeft = UDim.new(0, 7)
+	v1_423.PaddingRight = UDim.new(0, 7)
+	v1_423.Parent = v1_422
+	local v1_424 = Instance.new("UISizeConstraint")
+	v1_424.MinSize = Vector2.new(30, 20)
+	v1_424.MaxSize = Vector2.new(96, 20)
+	v1_424.Parent = v1_422
+	local function v1_425()
+		if v1_421._isListening then
+			v1_422.Text = "..."
 		else
-			v1_383.Text = v1_382._key and v1_382._key.Name or "None"
+			v1_422.Text = v1_421._key and v1_421._key.Name or v0_82("None")
 		end
 	end
-	local function v1_387()
-		v1_383.BackgroundColor3 = v0_8.Danger
-		v0_12(v1_383, { BackgroundColor3 = v0_8.Card }, 0.45)
+	v1_414:_onLang(v1_422, v1_425)
+	local function v1_426()
+		v1_422.BackgroundColor3 = v0_8.Danger
+		v0_12(v1_422, { BackgroundColor3 = v0_8.Card }, 0.45)
 	end
-	function v1_382:Set(v2_388, v2_389)
-		v2_388 = v0_370(v2_388)
-		if v2_388 and v1_375:_keyTaken(v2_388, v1_382) then
-			warn("[RobloxUI] key already in use:", v2_388.Name)
-			v1_387()
+	function v1_421:Set(v2_427, v2_428)
+		v2_427 = v0_409(v2_427)
+		if v2_427 and v1_414:_keyTaken(v2_427, v1_421) then
+			warn("[RobloxUI] key already in use:", v2_427.Name)
+			v1_426()
 			return false
 		end
-		v1_382._key = v2_388
-		v1_386()
-		if not v2_389 and v1_377.Callback then v1_377.Callback(v2_388) end
+		v1_421._key = v2_427
+		v1_425()
+		if not v2_428 and v1_416.Callback then v1_416.Callback(v2_427) end
 		return true
 	end
-	function v1_382:Get()
-		return v1_382._key
+	function v1_421:Get()
+		return v1_421._key
 	end
-	function v1_382:_startListening()
-		if v1_375._listening and v1_375._listening ~= v1_382 then
-			v1_375._listening:_stopListening()
+	function v1_421:_startListening()
+		if v1_414._listening and v1_414._listening ~= v1_421 then
+			v1_414._listening:_stopListening()
 		end
-		v1_375._listening = v1_382
-		v1_382._isListening = true
-		v0_12(v1_383, { BackgroundColor3 = v0_8.Accent }, 0.15)
-		v1_386()
+		v1_414._listening = v1_421
+		v1_421._isListening = true
+		v0_12(v1_422, { BackgroundColor3 = v0_8.Accent }, 0.15)
+		v1_425()
 	end
-	function v1_382:_stopListening()
-		if v1_375._listening == v1_382 then v1_375._listening = nil end
-		v1_382._isListening = false
-		v0_12(v1_383, { BackgroundColor3 = v0_8.Card }, 0.15)
-		v1_386()
+	function v1_421:_stopListening()
+		if v1_414._listening == v1_421 then v1_414._listening = nil end
+		v1_421._isListening = false
+		v0_12(v1_422, { BackgroundColor3 = v0_8.Card }, 0.15)
+		v1_425()
 	end
-	function v1_382:_capture(v2_390)
-		if v2_390 == Enum.KeyCode.Unknown then return end
-		v1_382:_stopListening()
-		if v2_390 == Enum.KeyCode.Escape then return end
-		if v2_390 == Enum.KeyCode.Backspace or v2_390 == Enum.KeyCode.Delete then
-			v1_382:Set(nil)
+	function v1_421:_capture(v2_429)
+		if v2_429 == Enum.KeyCode.Unknown then return end
+		v1_421:_stopListening()
+		if v2_429 == Enum.KeyCode.Escape then return end
+		if v2_429 == Enum.KeyCode.Backspace or v2_429 == Enum.KeyCode.Delete then
+			v1_421:Set(nil)
 		else
-			v1_382:Set(v2_390)
+			v1_421:Set(v2_429)
 		end
 	end
-	function v1_382:Destroy()
-		if v1_382._destroyed then return end
-		v1_382._destroyed = true
-		if v1_375._listening == v1_382 then v1_375._listening = nil end
-		local v2_391 = table.find(v1_375._binds, v1_382)
-		if v2_391 then table.remove(v1_375._binds, v2_391) end
-		v1_375._cleanups[v1_382] = nil
-		for v3_392, v3_393 in ipairs(v1_381) do v3_393:Disconnect() end
-		v1_381 = {}
-		v1_383:Destroy()
+	function v1_421:Destroy()
+		if v1_421._destroyed then return end
+		v1_421._destroyed = true
+		if v1_414._listening == v1_421 then v1_414._listening = nil end
+		local v2_430 = table.find(v1_414._binds, v1_421)
+		if v2_430 then table.remove(v1_414._binds, v2_430) end
+		v1_414._cleanups[v1_421] = nil
+		for v3_431, v3_432 in ipairs(v1_420) do v3_432:Disconnect() end
+		v1_420 = {}
+		v1_422:Destroy()
 	end
-	if v1_380 then
-		v0_21(v1_383, v0_8.Card, v0_8.Sidebar, function() return v1_382._isListening end)
-		table.insert(v1_381, v1_383.MouseButton1Click:Connect(function()
-			if v1_382._isListening then v1_382:_stopListening() else v1_382:_startListening() end
+	if v1_419 then
+		v0_21(v1_422, v0_8.Card, v0_8.Sidebar, function() return v1_421._isListening end)
+		table.insert(v1_420, v1_422.MouseButton1Click:Connect(function()
+			if v1_421._isListening then v1_421:_stopListening() else v1_421:_startListening() end
 		end))
-		table.insert(v1_381, v1_383.MouseButton2Click:Connect(function()
-			if v1_382._isListening then v1_382:_stopListening() end
-			v1_382:Set(nil)
+		table.insert(v1_420, v1_422.MouseButton2Click:Connect(function()
+			if v1_421._isListening then v1_421:_stopListening() end
+			v1_421:Set(nil)
 		end))
 	end
-	if v1_377.Key ~= nil then
-		v1_382:Set(v1_377.Key, true)
+	if v1_416.Key ~= nil then
+		v1_421:Set(v1_416.Key, true)
 	end
-	table.insert(v1_375._binds, v1_382)
-	v1_375._cleanups[v1_382] = function() v1_382:Destroy() end
-	return v1_382
+	table.insert(v1_414._binds, v1_421)
+	v1_414._cleanups[v1_421] = function() v1_421:Destroy() end
+	return v1_421
 end
-local function v0_394(v1_395, v1_396, v1_397)
-	local v1_398 = v1_396.Instance
-	local function v1_399()
-		local v2_400 = math.clamp(v1_398.TextBounds.X + 14, 30, 96)
-		v1_395.Size = UDim2.new(1, -(v1_397 + v2_400 + 6), 1, 0)
+local function v0_433(v1_434, v1_435, v1_436)
+	local v1_437 = v1_435.Instance
+	local function v1_438()
+		local v2_439 = math.clamp(v1_437.TextBounds.X + 14, 30, 96)
+		v1_434.Size = UDim2.new(1, -(v1_436 + v2_439 + 6), 1, 0)
 	end
-	v1_399()
-	v1_398:GetPropertyChangedSignal("TextBounds"):Connect(v1_399)
+	v1_438()
+	v1_437:GetPropertyChangedSignal("TextBounds"):Connect(v1_438)
 end
-function v0_3:AddButton(v1_401)
-	v1_401 = v1_401 or {}
+function v0_3:AddButton(v1_440)
+	v1_440 = v1_440 or {}
 	self._count += 1
-	local v1_402 = Instance.new("TextButton")
-	v1_402.Name = "Button"
-	v1_402.Size = UDim2.new(1, 0, 0, 32)
-	v1_402.BackgroundColor3 = v0_8.Element
-	v1_402.BorderSizePixel = 0
-	v1_402.Text = v1_401.Name or "Button"
-	v1_402.TextColor3 = v0_8.Text
-	v1_402.Font = Enum.Font.Gotham
-	v1_402.TextSize = 14
-	v1_402.TextTruncate = Enum.TextTruncate.AtEnd
-	v1_402.AutoButtonColor = false
-	v1_402.LayoutOrder = self._count
-	v1_402.Parent = self.Holder
-	v0_63(v1_402, 6)
-	local v1_403 = Instance.new("UIPadding")
-	v1_403.PaddingLeft = UDim.new(0, 8)
-	v1_403.PaddingRight = UDim.new(0, 8)
-	v1_403.Parent = v1_402
-	v0_21(v1_402, v0_8.Element, v0_8.Hover)
-	v1_402.MouseButton1Click:Connect(function()
-		v1_402.BackgroundColor3 = v0_8.Accent
-		v0_12(v1_402, { BackgroundColor3 = v0_8.Hover }, 0.3)
-		if v1_401.Callback then v1_401.Callback() end
+	local v1_441 = Instance.new("TextButton")
+	v1_441.Name = "Button"
+	v1_441.Size = UDim2.new(1, 0, 0, 32)
+	v1_441.BackgroundColor3 = v0_8.Element
+	v1_441.BorderSizePixel = 0
+	self._lib:_track(v1_441, "Text", v1_440.Name or "Button")
+	v1_441.TextColor3 = v0_8.Text
+	v1_441.Font = Enum.Font.Gotham
+	v1_441.TextSize = 14
+	v1_441.TextTruncate = Enum.TextTruncate.AtEnd
+	v1_441.AutoButtonColor = false
+	v1_441.LayoutOrder = self._count
+	v1_441.Parent = self.Holder
+	v0_63(v1_441, 6)
+	local v1_442 = Instance.new("UIPadding")
+	v1_442.PaddingLeft = UDim.new(0, 8)
+	v1_442.PaddingRight = UDim.new(0, 8)
+	v1_442.Parent = v1_441
+	v0_21(v1_441, v0_8.Element, v0_8.Hover)
+	v1_441.MouseButton1Click:Connect(function()
+		v1_441.BackgroundColor3 = v0_8.Accent
+		v0_12(v1_441, { BackgroundColor3 = v0_8.Hover }, 0.3)
+		if v1_440.Callback then v1_440.Callback() end
 	end)
-	return v1_402
+	return v1_441
 end
-function v0_3:AddToggle(v1_404)
-	v1_404 = v1_404 or {}
+function v0_3:AddToggle(v1_443)
+	v1_443 = v1_443 or {}
 	self._count += 1
-	local v1_405 = v1_404.Default == true
-	local v1_406 = self
-	local v1_407 = Instance.new("TextButton")
-	v1_407.Name = "Toggle"
-	v1_407.Size = UDim2.new(1, 0, 0, 32)
-	v1_407.BackgroundColor3 = v0_8.Element
-	v1_407.BorderSizePixel = 0
-	v1_407.Text = ""
-	v1_407.AutoButtonColor = false
-	v1_407.LayoutOrder = self._count
-	v1_407.Parent = self.Holder
-	v0_63(v1_407, 6)
-	v0_21(v1_407, v0_8.Element, v0_8.Hover)
-	local v1_408 = Instance.new("TextLabel")
-	v1_408.Name = "Label"
-	v1_408.Position = UDim2.new(0, 8, 0, 0)
-	v1_408.Size = UDim2.new(1, -60, 1, 0)
-	v1_408.BackgroundTransparency = 1
-	v1_408.BorderSizePixel = 0
-	v1_408.Text = v1_404.Name or "Toggle"
-	v1_408.TextColor3 = v0_8.Text
-	v1_408.Font = Enum.Font.Gotham
-	v1_408.TextSize = 14
-	v1_408.TextXAlignment = Enum.TextXAlignment.Left
-	v1_408.TextTruncate = Enum.TextTruncate.AtEnd
-	v1_408.Parent = v1_407
-	local v1_409 = Instance.new("Frame")
-	v1_409.Name = "Track"
-	v1_409.AnchorPoint = Vector2.new(1, 0.5)
-	v1_409.Position = UDim2.new(1, -8, 0.5, 0)
-	v1_409.Size = UDim2.new(0, 34, 0, 18)
-	v1_409.BackgroundColor3 = v0_8.Off
-	v1_409.BorderSizePixel = 0
-	v1_409.Parent = v1_407
-	v0_63(v1_409, 9)
-	local v1_410 = Instance.new("Frame")
-	v1_410.Name = "Knob"
-	v1_410.AnchorPoint = Vector2.new(0, 0.5)
-	v1_410.Position = UDim2.new(0, 2, 0.5, 0)
-	v1_410.Size = UDim2.new(0, 14, 0, 14)
-	v1_410.BackgroundColor3 = v0_8.Text
-	v1_410.BorderSizePixel = 0
-	v1_410.Parent = v1_409
-	v0_63(v1_410, 7)
-	local function v1_411(v2_412)
-		local v2_413 = TweenInfo.new(v2_412 and 0.15 or 0, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-		v0_5:Create(v1_409, v2_413, { BackgroundColor3 = v1_405 and v0_8.Accent or v0_8.Off }):Play()
-		v0_5:Create(v1_410, v2_413, {
-			Position = v1_405 and UDim2.new(1, -16, 0.5, 0) or UDim2.new(0, 2, 0.5, 0),
+	local v1_444 = v1_443.Default == true
+	local v1_445 = self
+	local v1_446 = Instance.new("TextButton")
+	v1_446.Name = "Toggle"
+	v1_446.Size = UDim2.new(1, 0, 0, 32)
+	v1_446.BackgroundColor3 = v0_8.Element
+	v1_446.BorderSizePixel = 0
+	v1_446.Text = ""
+	v1_446.AutoButtonColor = false
+	v1_446.LayoutOrder = self._count
+	v1_446.Parent = self.Holder
+	v0_63(v1_446, 6)
+	v0_21(v1_446, v0_8.Element, v0_8.Hover)
+	local v1_447 = Instance.new("TextLabel")
+	v1_447.Name = "Label"
+	v1_447.Position = UDim2.new(0, 8, 0, 0)
+	v1_447.Size = UDim2.new(1, -60, 1, 0)
+	v1_447.BackgroundTransparency = 1
+	v1_447.BorderSizePixel = 0
+	self._lib:_track(v1_447, "Text", v1_443.Name or "Toggle")
+	v1_447.TextColor3 = v0_8.Text
+	v1_447.Font = Enum.Font.Gotham
+	v1_447.TextSize = 14
+	v1_447.TextXAlignment = Enum.TextXAlignment.Left
+	v1_447.TextTruncate = Enum.TextTruncate.AtEnd
+	v1_447.Parent = v1_446
+	local v1_448 = Instance.new("Frame")
+	v1_448.Name = "Track"
+	v1_448.AnchorPoint = Vector2.new(1, 0.5)
+	v1_448.Position = UDim2.new(1, -8, 0.5, 0)
+	v1_448.Size = UDim2.new(0, 34, 0, 18)
+	v1_448.BackgroundColor3 = v0_8.Off
+	v1_448.BorderSizePixel = 0
+	v1_448.Parent = v1_446
+	v0_63(v1_448, 9)
+	local v1_449 = Instance.new("Frame")
+	v1_449.Name = "Knob"
+	v1_449.AnchorPoint = Vector2.new(0, 0.5)
+	v1_449.Position = UDim2.new(0, 2, 0.5, 0)
+	v1_449.Size = UDim2.new(0, 14, 0, 14)
+	v1_449.BackgroundColor3 = v0_8.Text
+	v1_449.BorderSizePixel = 0
+	v1_449.Parent = v1_448
+	v0_63(v1_449, 7)
+	local function v1_450(v2_451)
+		local v2_452 = TweenInfo.new(v2_451 and 0.15 or 0, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		v0_5:Create(v1_448, v2_452, { BackgroundColor3 = v1_444 and v0_8.Accent or v0_8.Off }):Play()
+		v0_5:Create(v1_449, v2_452, {
+			Position = v1_444 and UDim2.new(1, -16, 0.5, 0) or UDim2.new(0, 2, 0.5, 0),
 		}):Play()
 	end
-	v1_411(false)
-	local v1_414 = { Instance = v1_407 }
-	function v1_414:Set(v2_415, v2_416)
-		v1_405 = v2_415 and true or false
-		v1_411(true)
-		if not v2_416 and v1_404.Callback then v1_404.Callback(v1_405) end
+	v1_450(false)
+	local v1_453 = { Instance = v1_446 }
+	function v1_453:Set(v2_454, v2_455)
+		v1_444 = v2_454 and true or false
+		v1_450(true)
+		if not v2_455 and v1_443.Callback then v1_443.Callback(v1_444) end
 	end
-	function v1_414:Get()
-		return v1_405
+	function v1_453:Get()
+		return v1_444
 	end
-	v1_407.MouseButton1Click:Connect(function()
-		v1_414:Set(not v1_405)
+	v1_446.MouseButton1Click:Connect(function()
+		v1_453:Set(not v1_444)
 	end)
-	function v1_414:AddKeybind(v2_417)
-		if v1_414.Keybind then
+	function v1_453:AddKeybind(v2_456)
+		if v1_453.Keybind then
 			warn("[RobloxUI] this toggle already has a keybind")
-			return v1_414.Keybind
+			return v1_453.Keybind
 		end
-		local v2_418 = v0_374(v1_406._lib, v1_407, v2_417, UDim2.new(1, -48, 0.5, 0), function()
-			v1_414:Set(not v1_405)
+		local v2_457 = v0_413(v1_445._lib, v1_446, v2_456, UDim2.new(1, -48, 0.5, 0), function()
+			v1_453:Set(not v1_444)
 		end)
-		v0_394(v1_408, v2_418, 60)
-		local v2_419 = v2_418.Destroy
-		function v2_418:Destroy()
-			v2_419(v2_418)
-			v1_414.Keybind = nil
-			v1_408.Size = UDim2.new(1, -60, 1, 0)
+		v0_433(v1_447, v2_457, 60)
+		local v2_458 = v2_457.Destroy
+		function v2_457:Destroy()
+			v2_458(v2_457)
+			v1_453.Keybind = nil
+			v1_447.Size = UDim2.new(1, -60, 1, 0)
 		end
-		v1_414.Keybind = v2_418
-		return v2_418
+		v1_453.Keybind = v2_457
+		return v2_457
 	end
-	function v1_414:Destroy()
-		if v1_414._destroyed then return end
-		v1_414._destroyed = true
-		if v1_414.Keybind then v1_414.Keybind:Destroy() end
-		v1_407:Destroy()
+	function v1_453:Destroy()
+		if v1_453._destroyed then return end
+		v1_453._destroyed = true
+		if v1_453.Keybind then v1_453.Keybind:Destroy() end
+		v1_446:Destroy()
 	end
-	return v1_414
+	return v1_453
 end
-function v0_3:AddParagraph(v1_420)
-	v1_420 = v1_420 or {}
+function v0_3:AddParagraph(v1_459)
+	v1_459 = v1_459 or {}
 	self._count += 1
-	local v1_421 = v1_420.Title and tostring(v1_420.Title) or ""
-	local v1_422 = v1_420.Content and tostring(v1_420.Content) or ""
-	local v1_423 = Instance.new("Frame")
-	v1_423.Name = "Paragraph"
-	v1_423.Size = UDim2.new(1, 0, 0, 0)
-	v1_423.AutomaticSize = Enum.AutomaticSize.Y
-	v1_423.BackgroundColor3 = v0_8.Element
-	v1_423.BorderSizePixel = 0
-	v1_423.LayoutOrder = self._count
-	v1_423.Parent = self.Holder
-	v0_63(v1_423, 6)
-	local v1_424 = Instance.new("UIPadding")
-	v1_424.PaddingTop = UDim.new(0, 8)
-	v1_424.PaddingBottom = UDim.new(0, 8)
-	v1_424.PaddingLeft = UDim.new(0, 8)
-	v1_424.PaddingRight = UDim.new(0, 8)
-	v1_424.Parent = v1_423
-	local v1_425 = Instance.new("UIListLayout")
-	v1_425.Padding = UDim.new(0, 3)
-	v1_425.SortOrder = Enum.SortOrder.LayoutOrder
-	v1_425.Parent = v1_423
-	local function v1_426(v2_427, v2_428, v2_429, v2_430, v2_431)
-		local v2_432 = Instance.new("TextLabel")
-		v2_432.Name = v2_427
-		v2_432.Size = UDim2.new(1, 0, 0, 0)
-		v2_432.AutomaticSize = Enum.AutomaticSize.Y
-		v2_432.BackgroundTransparency = 1
-		v2_432.BorderSizePixel = 0
-		v2_432.TextColor3 = v2_430
-		v2_432.Font = v2_428
-		v2_432.TextSize = v2_429
-		v2_432.TextWrapped = true
-		v2_432.RichText = v1_420.RichText == true
-		v2_432.TextXAlignment = Enum.TextXAlignment.Left
-		v2_432.TextYAlignment = Enum.TextYAlignment.Top
-		v2_432.LayoutOrder = v2_431
-		v2_432.Parent = v1_423
-		return v2_432
-	end
-	local v1_433 = v1_426("Title", Enum.Font.GothamBold, 14, v0_8.Text, 1)
-	local v1_434 = v1_426("Content", Enum.Font.Gotham, 13, v0_8.SubText, 2)
-	local function v1_435(v2_436)
-		v1_433.Text = v1_421
-		v1_433.Visible = v1_421 ~= ""
-		v1_434.Text = v1_422
-		v1_434.Visible = v1_422 ~= ""
-		if v2_436 then
-			v1_433.TextTransparency = 1
-			v1_434.TextTransparency = 1
-			v0_12(v1_433, { TextTransparency = 0 }, 0.2)
-			v0_12(v1_434, { TextTransparency = 0 }, 0.2)
-		end
-	end
-	v1_435(false)
-	local v1_437 = { Instance = v1_423 }
-	function v1_437:SetTitle(v2_438)
-		v1_421 = v2_438 and tostring(v2_438) or ""
-		v1_435(true)
-	end
-	function v1_437:SetContent(v2_439)
-		v1_422 = v2_439 and tostring(v2_439) or ""
-		v1_435(true)
-	end
-	function v1_437:Set(v2_440)
-		v2_440 = v2_440 or {}
-		if v2_440.Title ~= nil then v1_421 = tostring(v2_440.Title) end
-		if v2_440.Content ~= nil then v1_422 = tostring(v2_440.Content) end
-		v1_435(true)
-	end
-	function v1_437:Get()
-		return v1_421, v1_422
-	end
-	function v1_437:Destroy()
-		v1_423:Destroy()
-	end
-	return v1_437
-end
-function v0_3:AddTextbox(v1_441)
-	v1_441 = v1_441 or {}
-	self._count += 1
-	local v1_442 = v1_441.Numeric == true
-	local v1_443 = tonumber(v1_441.MaxLength)
-	local v1_444 = v1_441.Name ~= nil and v1_441.Name ~= ""
-	local v1_445, v1_446, v1_447 = false, false, false
-	local function v1_448(v2_449)
-		if v1_441.Min then v2_449 = math.max(v2_449, v1_441.Min) end
-		if v1_441.Max then v2_449 = math.min(v2_449, v1_441.Max) end
-		return v2_449
-	end
-	local v1_450
-	if v1_442 then
-		v1_450 = tonumber(v1_441.Default)
-		if v1_450 then v1_450 = v1_448(v1_450) end
-	else
-		v1_450 = tostring(v1_441.Default or "")
-	end
-	local function v1_451(v2_452)
-		return v2_452 == nil and "" or tostring(v2_452)
-	end
-	local function v1_453(v2_454)
-		local v2_455 = v2_454:sub(1, 1) == "-"
-		v2_454 = v2_454:gsub("[^%d%.]", "")
-		local v2_456 = v2_454:find(".", 1, true)
-		if v2_456 then
-			local v3_457 = v2_454:sub(v2_456 + 1):gsub("%.", "")
-			v2_454 = v2_454:sub(1, v2_456) .. v3_457
-		end
-		return (v2_455 and "-" or "") .. v2_454
-	end
-	local v1_458 = Instance.new("Frame")
-	v1_458.Name = "Textbox"
-	v1_458.Size = UDim2.new(1, 0, 0, 32)
-	v1_458.BackgroundColor3 = v0_8.Element
-	v1_458.BorderSizePixel = 0
-	v1_458.LayoutOrder = self._count
-	v1_458.Parent = self.Holder
-	v0_63(v1_458, 6)
-	if v1_444 then
-		local v2_459 = Instance.new("TextLabel")
-		v2_459.Name = "Label"
-		v2_459.Position = UDim2.new(0, 8, 0, 0)
-		v2_459.Size = UDim2.new(0.4, -8, 1, 0)
-		v2_459.BackgroundTransparency = 1
-		v2_459.BorderSizePixel = 0
-		v2_459.Text = v1_441.Name
-		v2_459.TextColor3 = v0_8.Text
-		v2_459.Font = Enum.Font.Gotham
-		v2_459.TextSize = 14
-		v2_459.TextXAlignment = Enum.TextXAlignment.Left
-		v2_459.TextTruncate = Enum.TextTruncate.AtEnd
-		v2_459.Parent = v1_458
-	end
-	local v1_460 = Instance.new("Frame")
-	v1_460.Name = "BoxHolder"
-	v1_460.AnchorPoint = Vector2.new(1, 0.5)
-	v1_460.Position = UDim2.new(1, -6, 0.5, 0)
-	v1_460.Size = v1_444 and UDim2.new(0.6, -10, 0, 22) or UDim2.new(1, -12, 0, 22)
-	v1_460.BackgroundColor3 = v0_8.Card
-	v1_460.BorderSizePixel = 0
-	v1_460.Parent = v1_458
-	v0_63(v1_460, 5)
-	local v1_461 = Instance.new("UIStroke")
-	v1_461.Color = v0_8.Accent
-	v1_461.Thickness = 1
-	v1_461.Transparency = 1
-	v1_461.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	v1_461.Parent = v1_460
-	local v1_462 = Instance.new("TextBox")
-	v1_462.Name = "Input"
-	v1_462.Size = UDim2.new(1, 0, 1, 0)
-	v1_462.BackgroundTransparency = 1
+	local v1_460 = v1_459.Title and tostring(v1_459.Title) or ""
+	local v1_461 = v1_459.Content and tostring(v1_459.Content) or ""
+	local v1_462 = Instance.new("Frame")
+	v1_462.Name = "Paragraph"
+	v1_462.Size = UDim2.new(1, 0, 0, 0)
+	v1_462.AutomaticSize = Enum.AutomaticSize.Y
+	v1_462.BackgroundColor3 = v0_8.Element
 	v1_462.BorderSizePixel = 0
-	v1_462.Text = v1_451(v1_450)
-	v1_462.PlaceholderText = v1_441.Placeholder or ""
-	v1_462.PlaceholderColor3 = v0_8.IconOff
-	v1_462.TextColor3 = v0_8.Text
-	v1_462.Font = Enum.Font.Gotham
-	v1_462.TextSize = 13
-	v1_462.TextXAlignment = Enum.TextXAlignment.Left
-	v1_462.ClearTextOnFocus = v1_441.ClearTextOnFocus == true
-	v1_462.ClipsDescendants = true
-	v1_462.Parent = v1_460
+	v1_462.LayoutOrder = self._count
+	v1_462.Parent = self.Holder
+	v0_63(v1_462, 6)
 	local v1_463 = Instance.new("UIPadding")
-	v1_463.PaddingLeft = UDim.new(0, 6)
-	v1_463.PaddingRight = UDim.new(0, 6)
+	v1_463.PaddingTop = UDim.new(0, 8)
+	v1_463.PaddingBottom = UDim.new(0, 8)
+	v1_463.PaddingLeft = UDim.new(0, 8)
+	v1_463.PaddingRight = UDim.new(0, 8)
 	v1_463.Parent = v1_462
-	local function v1_464()
-		v0_12(v1_460, { BackgroundColor3 = (v1_446 and not v1_445) and v0_8.Sidebar or v0_8.Card }, 0.12)
-		v0_12(v1_461, { Transparency = v1_445 and 0 or 1 }, 0.15)
+	local v1_464 = Instance.new("UIListLayout")
+	v1_464.Padding = UDim.new(0, 3)
+	v1_464.SortOrder = Enum.SortOrder.LayoutOrder
+	v1_464.Parent = v1_462
+	local function v1_465(v2_466, v2_467, v2_468, v2_469, v2_470)
+		local v2_471 = Instance.new("TextLabel")
+		v2_471.Name = v2_466
+		v2_471.Size = UDim2.new(1, 0, 0, 0)
+		v2_471.AutomaticSize = Enum.AutomaticSize.Y
+		v2_471.BackgroundTransparency = 1
+		v2_471.BorderSizePixel = 0
+		v2_471.TextColor3 = v2_469
+		v2_471.Font = v2_467
+		v2_471.TextSize = v2_468
+		v2_471.TextWrapped = true
+		v2_471.RichText = v1_459.RichText == true
+		v2_471.TextXAlignment = Enum.TextXAlignment.Left
+		v2_471.TextYAlignment = Enum.TextYAlignment.Top
+		v2_471.LayoutOrder = v2_470
+		v2_471.Parent = v1_462
+		return v2_471
 	end
-	v1_462:GetPropertyChangedSignal("Text"):Connect(function()
-		if v1_447 then return end
-		local v2_465 = v1_462.Text
-		if v1_442 then v2_465 = v1_453(v2_465) end
-		if v1_443 and #v2_465 > v1_443 then v2_465 = v2_465:sub(1, v1_443) end
-		if v2_465 ~= v1_462.Text then
-			v1_447 = true
-			v1_462.Text = v2_465
-			v1_447 = false
+	local v1_472 = v1_465("Title", Enum.Font.GothamBold, 14, v0_8.Text, 1)
+	local v1_473 = v1_465("Content", Enum.Font.Gotham, 13, v0_8.SubText, 2)
+	local v1_474 = self._lib:_track(v1_472, "Text", "")
+	local v1_475 = self._lib:_track(v1_473, "Text", "")
+	local function v1_476(v2_477)
+		v1_474.key = v1_460
+		v1_472.Text = v0_82(v1_460)
+		v1_472.Visible = v1_460 ~= ""
+		v1_475.key = v1_461
+		v1_473.Text = v0_82(v1_461)
+		v1_473.Visible = v1_461 ~= ""
+		if v2_477 then
+			v1_472.TextTransparency = 1
+			v1_473.TextTransparency = 1
+			v0_12(v1_472, { TextTransparency = 0 }, 0.2)
+			v0_12(v1_473, { TextTransparency = 0 }, 0.2)
+		end
+	end
+	v1_476(false)
+	local v1_478 = { Instance = v1_462 }
+	function v1_478:SetTitle(v2_479)
+		v1_460 = v2_479 and tostring(v2_479) or ""
+		v1_476(true)
+	end
+	function v1_478:SetContent(v2_480)
+		v1_461 = v2_480 and tostring(v2_480) or ""
+		v1_476(true)
+	end
+	function v1_478:Set(v2_481)
+		v2_481 = v2_481 or {}
+		if v2_481.Title ~= nil then v1_460 = tostring(v2_481.Title) end
+		if v2_481.Content ~= nil then v1_461 = tostring(v2_481.Content) end
+		v1_476(true)
+	end
+	function v1_478:Get()
+		return v1_460, v1_461
+	end
+	function v1_478:Destroy()
+		v1_462:Destroy()
+	end
+	return v1_478
+end
+function v0_3:AddTextbox(v1_482)
+	v1_482 = v1_482 or {}
+	self._count += 1
+	local v1_483 = v1_482.Numeric == true
+	local v1_484 = tonumber(v1_482.MaxLength)
+	local v1_485 = v1_482.Name ~= nil and v1_482.Name ~= ""
+	local v1_486, v1_487, v1_488 = false, false, false
+	local function v1_489(v2_490)
+		if v1_482.Min then v2_490 = math.max(v2_490, v1_482.Min) end
+		if v1_482.Max then v2_490 = math.min(v2_490, v1_482.Max) end
+		return v2_490
+	end
+	local v1_491
+	if v1_483 then
+		v1_491 = tonumber(v1_482.Default)
+		if v1_491 then v1_491 = v1_489(v1_491) end
+	else
+		v1_491 = tostring(v1_482.Default or "")
+	end
+	local function v1_492(v2_493)
+		return v2_493 == nil and "" or tostring(v2_493)
+	end
+	local function v1_494(v2_495)
+		local v2_496 = v2_495:sub(1, 1) == "-"
+		v2_495 = v2_495:gsub("[^%d%.]", "")
+		local v2_497 = v2_495:find(".", 1, true)
+		if v2_497 then
+			local v3_498 = v2_495:sub(v2_497 + 1):gsub("%.", "")
+			v2_495 = v2_495:sub(1, v2_497) .. v3_498
+		end
+		return (v2_496 and "-" or "") .. v2_495
+	end
+	local v1_499 = Instance.new("Frame")
+	v1_499.Name = "Textbox"
+	v1_499.Size = UDim2.new(1, 0, 0, 32)
+	v1_499.BackgroundColor3 = v0_8.Element
+	v1_499.BorderSizePixel = 0
+	v1_499.LayoutOrder = self._count
+	v1_499.Parent = self.Holder
+	v0_63(v1_499, 6)
+	if v1_485 then
+		local v2_500 = Instance.new("TextLabel")
+		v2_500.Name = "Label"
+		v2_500.Position = UDim2.new(0, 8, 0, 0)
+		v2_500.Size = UDim2.new(0.4, -8, 1, 0)
+		v2_500.BackgroundTransparency = 1
+		v2_500.BorderSizePixel = 0
+		self._lib:_track(v2_500, "Text", v1_482.Name)
+		v2_500.TextColor3 = v0_8.Text
+		v2_500.Font = Enum.Font.Gotham
+		v2_500.TextSize = 14
+		v2_500.TextXAlignment = Enum.TextXAlignment.Left
+		v2_500.TextTruncate = Enum.TextTruncate.AtEnd
+		v2_500.Parent = v1_499
+	end
+	local v1_501 = Instance.new("Frame")
+	v1_501.Name = "BoxHolder"
+	v1_501.AnchorPoint = Vector2.new(1, 0.5)
+	v1_501.Position = UDim2.new(1, -6, 0.5, 0)
+	v1_501.Size = v1_485 and UDim2.new(0.6, -10, 0, 22) or UDim2.new(1, -12, 0, 22)
+	v1_501.BackgroundColor3 = v0_8.Card
+	v1_501.BorderSizePixel = 0
+	v1_501.Parent = v1_499
+	v0_63(v1_501, 5)
+	local v1_502 = Instance.new("UIStroke")
+	v1_502.Color = v0_8.Accent
+	v1_502.Thickness = 1
+	v1_502.Transparency = 1
+	v1_502.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	v1_502.Parent = v1_501
+	local v1_503 = Instance.new("TextBox")
+	v1_503.Name = "Input"
+	v1_503.Size = UDim2.new(1, 0, 1, 0)
+	v1_503.BackgroundTransparency = 1
+	v1_503.BorderSizePixel = 0
+	v1_503.Text = v1_492(v1_491)
+	self._lib:_track(v1_503, "PlaceholderText", v1_482.Placeholder or "")
+	v1_503.PlaceholderColor3 = v0_8.IconOff
+	v1_503.TextColor3 = v0_8.Text
+	v1_503.Font = Enum.Font.Gotham
+	v1_503.TextSize = 13
+	v1_503.TextXAlignment = Enum.TextXAlignment.Left
+	v1_503.ClearTextOnFocus = v1_482.ClearTextOnFocus == true
+	v1_503.ClipsDescendants = true
+	v1_503.Parent = v1_501
+	local v1_504 = Instance.new("UIPadding")
+	v1_504.PaddingLeft = UDim.new(0, 6)
+	v1_504.PaddingRight = UDim.new(0, 6)
+	v1_504.Parent = v1_503
+	local function v1_505()
+		v0_12(v1_501, { BackgroundColor3 = (v1_487 and not v1_486) and v0_8.Sidebar or v0_8.Card }, 0.12)
+		v0_12(v1_502, { Transparency = v1_486 and 0 or 1 }, 0.15)
+	end
+	v1_503:GetPropertyChangedSignal("Text"):Connect(function()
+		if v1_488 then return end
+		local v2_506 = v1_503.Text
+		if v1_483 then v2_506 = v1_494(v2_506) end
+		if v1_484 and #v2_506 > v1_484 then v2_506 = v2_506:sub(1, v1_484) end
+		if v2_506 ~= v1_503.Text then
+			v1_488 = true
+			v1_503.Text = v2_506
+			v1_488 = false
 		end
 	end)
-	v1_462.Focused:Connect(function()
-		v1_445 = true
-		v1_464()
+	v1_503.Focused:Connect(function()
+		v1_486 = true
+		v1_505()
 	end)
-	v1_462.FocusLost:Connect(function(v2_466)
-		v1_445 = false
-		v1_464()
-		if v1_442 then
-			local v3_467 = tonumber(v1_462.Text)
-			if v3_467 == nil then
-				v1_462.Text = v1_451(v1_450)
+	v1_503.FocusLost:Connect(function(v2_507)
+		v1_486 = false
+		v1_505()
+		if v1_483 then
+			local v3_508 = tonumber(v1_503.Text)
+			if v3_508 == nil then
+				v1_503.Text = v1_492(v1_491)
 				return
 			end
-			v3_467 = v1_448(v3_467)
-			v1_450 = v3_467
-			v1_462.Text = v1_451(v3_467)
+			v3_508 = v1_489(v3_508)
+			v1_491 = v3_508
+			v1_503.Text = v1_492(v3_508)
 		else
-			v1_450 = v1_462.Text
+			v1_491 = v1_503.Text
 		end
-		if v1_441.Callback then v1_441.Callback(v1_450, v2_466) end
+		if v1_482.Callback then v1_482.Callback(v1_491, v2_507) end
 	end)
-	v1_460.MouseEnter:Connect(function()
-		v1_446 = true
-		v1_464()
+	v1_501.MouseEnter:Connect(function()
+		v1_487 = true
+		v1_505()
 	end)
-	v1_460.MouseLeave:Connect(function()
-		v1_446 = false
-		v1_464()
+	v1_501.MouseLeave:Connect(function()
+		v1_487 = false
+		v1_505()
 	end)
-	local v1_468 = { Instance = v1_458 }
-	function v1_468:Set(v2_469, v2_470)
-		if v1_442 then
-			local v3_471 = tonumber(v2_469)
-			if v3_471 == nil then return end
-			v1_450 = v1_448(v3_471)
+	local v1_509 = { Instance = v1_499 }
+	function v1_509:Set(v2_510, v2_511)
+		if v1_483 then
+			local v3_512 = tonumber(v2_510)
+			if v3_512 == nil then return end
+			v1_491 = v1_489(v3_512)
 		else
-			v1_450 = tostring(v2_469 == nil and "" or v2_469)
-			if v1_443 then v1_450 = v1_450:sub(1, v1_443) end
+			v1_491 = tostring(v2_510 == nil and "" or v2_510)
+			if v1_484 then v1_491 = v1_491:sub(1, v1_484) end
 		end
-		v1_462.Text = v1_451(v1_450)
-		if not v2_470 and v1_441.Callback then v1_441.Callback(v1_450, false) end
+		v1_503.Text = v1_492(v1_491)
+		if not v2_511 and v1_482.Callback then v1_482.Callback(v1_491, false) end
 	end
-	function v1_468:Get()
-		return v1_450
+	function v1_509:Get()
+		return v1_491
 	end
-	function v1_468:Focus()
-		v1_462:CaptureFocus()
+	function v1_509:Focus()
+		v1_503:CaptureFocus()
 	end
-	function v1_468:Destroy()
-		if v1_462:IsFocused() then v1_462:ReleaseFocus() end
-		v1_458:Destroy()
+	function v1_509:Destroy()
+		if v1_503:IsFocused() then v1_503:ReleaseFocus() end
+		v1_499:Destroy()
 	end
-	return v1_468
+	return v1_509
 end
-function v0_3:AddKeybind(v1_472)
-	v1_472 = v1_472 or {}
+function v0_3:AddKeybind(v1_513)
+	v1_513 = v1_513 or {}
 	self._count += 1
-	local v1_473 = Instance.new("Frame")
-	v1_473.Name = "KeybindRow"
-	v1_473.Size = UDim2.new(1, 0, 0, 32)
-	v1_473.BackgroundColor3 = v0_8.Element
-	v1_473.BorderSizePixel = 0
-	v1_473.LayoutOrder = self._count
-	v1_473.Parent = self.Holder
-	v0_63(v1_473, 6)
-	local v1_474 = Instance.new("TextLabel")
-	v1_474.Name = "Label"
-	v1_474.Position = UDim2.new(0, 8, 0, 0)
-	v1_474.Size = UDim2.new(1, -60, 1, 0)
-	v1_474.BackgroundTransparency = 1
-	v1_474.BorderSizePixel = 0
-	v1_474.Text = v1_472.Name or "Keybind"
-	v1_474.TextColor3 = v0_8.Text
-	v1_474.Font = Enum.Font.Gotham
-	v1_474.TextSize = 14
-	v1_474.TextXAlignment = Enum.TextXAlignment.Left
-	v1_474.TextTruncate = Enum.TextTruncate.AtEnd
-	v1_474.Parent = v1_473
-	local v1_475 = v0_374(self._lib, v1_473, v1_472, UDim2.new(1, -8, 0.5, 0), function()
-		if v1_472.OnPress then v1_472.OnPress() end
+	local v1_514 = Instance.new("Frame")
+	v1_514.Name = "KeybindRow"
+	v1_514.Size = UDim2.new(1, 0, 0, 32)
+	v1_514.BackgroundColor3 = v0_8.Element
+	v1_514.BorderSizePixel = 0
+	v1_514.LayoutOrder = self._count
+	v1_514.Parent = self.Holder
+	v0_63(v1_514, 6)
+	local v1_515 = Instance.new("TextLabel")
+	v1_515.Name = "Label"
+	v1_515.Position = UDim2.new(0, 8, 0, 0)
+	v1_515.Size = UDim2.new(1, -60, 1, 0)
+	v1_515.BackgroundTransparency = 1
+	v1_515.BorderSizePixel = 0
+	self._lib:_track(v1_515, "Text", v1_513.Name or "Keybind")
+	v1_515.TextColor3 = v0_8.Text
+	v1_515.Font = Enum.Font.Gotham
+	v1_515.TextSize = 14
+	v1_515.TextXAlignment = Enum.TextXAlignment.Left
+	v1_515.TextTruncate = Enum.TextTruncate.AtEnd
+	v1_515.Parent = v1_514
+	local v1_516 = v0_413(self._lib, v1_514, v1_513, UDim2.new(1, -8, 0.5, 0), function()
+		if v1_513.OnPress then v1_513.OnPress() end
 	end)
-	v0_394(v1_474, v1_475, 16)
-	v1_475.Row = v1_473
-	local v1_476 = v1_475.Destroy
-	function v1_475:Destroy()
-		v1_476(v1_475)
-		v1_473:Destroy()
+	v0_433(v1_515, v1_516, 16)
+	v1_516.Row = v1_514
+	local v1_517 = v1_516.Destroy
+	function v1_516:Destroy()
+		v1_517(v1_516)
+		v1_514:Destroy()
 	end
-	return v1_475
+	return v1_516
 end
-function v0_3:AddSlider(v1_477)
-	v1_477 = v1_477 or {}
+function v0_3:AddSlider(v1_518)
+	v1_518 = v1_518 or {}
 	self._count += 1
-	local v1_478 = self._lib
-	local function v1_479(v2_480)
-		return #(tostring(v2_480):match("%.(%d+)") or "")
+	local v1_519 = self._lib
+	local function v1_520(v2_521)
+		return #(tostring(v2_521):match("%.(%d+)") or "")
 	end
-	local v1_481 = tonumber(v1_477.Min) or 0
-	local v1_482 = tonumber(v1_477.Max) or 100
-	if v1_482 < v1_481 then v1_481, v1_482 = v1_482, v1_481 end
-	local v1_483 = tonumber(v1_477.Increment) or 1
-	if v1_483 <= 0 then v1_483 = 1 end
-	local v1_484 = math.max(v1_479(v1_483), v1_479(v1_481))
-	local v1_485 = v1_477.ValueName
-	local function v1_486(v2_487)
-		v2_487 = math.clamp(v2_487, v1_481, v1_482)
-		v2_487 = v1_481 + math.floor((v2_487 - v1_481) / v1_483 + 0.5) * v1_483
-		v2_487 = math.clamp(v2_487, v1_481, v1_482)
-		local v2_488 = 10 ^ v1_484
-		return math.floor(v2_487 * v2_488 + 0.5) / v2_488
+	local v1_522 = tonumber(v1_518.Min) or 0
+	local v1_523 = tonumber(v1_518.Max) or 100
+	if v1_523 < v1_522 then v1_522, v1_523 = v1_523, v1_522 end
+	local v1_524 = tonumber(v1_518.Increment) or 1
+	if v1_524 <= 0 then v1_524 = 1 end
+	local v1_525 = math.max(v1_520(v1_524), v1_520(v1_522))
+	local v1_526 = v1_518.ValueName
+	local function v1_527(v2_528)
+		v2_528 = math.clamp(v2_528, v1_522, v1_523)
+		v2_528 = v1_522 + math.floor((v2_528 - v1_522) / v1_524 + 0.5) * v1_524
+		v2_528 = math.clamp(v2_528, v1_522, v1_523)
+		local v2_529 = 10 ^ v1_525
+		return math.floor(v2_528 * v2_529 + 0.5) / v2_529
 	end
-	local function v1_489(v2_490)
-		return v1_482 > v1_481 and (v2_490 - v1_481) / (v1_482 - v1_481) or 0
+	local function v1_530(v2_531)
+		return v1_523 > v1_522 and (v2_531 - v1_522) / (v1_523 - v1_522) or 0
 	end
-	local function v1_491(v2_492)
-		local v2_493 = v1_484 > 0 and string.format("%." .. v1_484 .. "f", v2_492) or tostring(v2_492)
-		if v1_485 and v1_485 ~= "" then v2_493 = v2_493 .. " " .. tostring(v1_485) end
-		return v2_493
+	local function v1_532(v2_533)
+		local v2_534 = v1_525 > 0 and string.format("%." .. v1_525 .. "f", v2_533) or tostring(v2_533)
+		if v1_526 and v1_526 ~= "" then v2_534 = v2_534 .. " " .. v0_82(tostring(v1_526)) end
+		return v2_534
 	end
-	local v1_494 = v1_486(tonumber(v1_477.Default) or v1_481)
-	local v1_495, v1_496 = false, false
-	local v1_497 = nil
-	local v1_498 = Instance.new("Frame")
-	v1_498.Name = "Slider"
-	v1_498.Size = UDim2.new(1, 0, 0, 46)
-	v1_498.BackgroundColor3 = v0_8.Element
-	v1_498.BorderSizePixel = 0
-	v1_498.LayoutOrder = self._count
-	v1_498.Parent = self.Holder
-	v0_63(v1_498, 6)
-	local v1_499 = Instance.new("TextLabel")
-	v1_499.Name = "Name"
-	v1_499.Position = UDim2.new(0, 8, 0, 6)
-	v1_499.Size = UDim2.new(0.6, -8, 0, 16)
-	v1_499.BackgroundTransparency = 1
-	v1_499.BorderSizePixel = 0
-	v1_499.Text = v1_477.Name or "Slider"
-	v1_499.TextColor3 = v0_8.Text
-	v1_499.Font = Enum.Font.Gotham
-	v1_499.TextSize = 14
-	v1_499.TextXAlignment = Enum.TextXAlignment.Left
-	v1_499.TextTruncate = Enum.TextTruncate.AtEnd
-	v1_499.Parent = v1_498
-	local v1_500 = Instance.new("TextLabel")
-	v1_500.Name = "Value"
-	v1_500.Position = UDim2.new(0.6, 0, 0, 6)
-	v1_500.Size = UDim2.new(0.4, -8, 0, 16)
-	v1_500.BackgroundTransparency = 1
-	v1_500.BorderSizePixel = 0
-	v1_500.Text = v1_491(v1_494)
-	v1_500.TextColor3 = v0_8.SubText
-	v1_500.Font = Enum.Font.GothamBold
-	v1_500.TextSize = 13
-	v1_500.TextXAlignment = Enum.TextXAlignment.Right
-	v1_500.TextTruncate = Enum.TextTruncate.AtEnd
-	v1_500.Parent = v1_498
-	local v1_501 = Instance.new("Frame")
-	v1_501.Name = "Track"
-	v1_501.Position = UDim2.new(0, 8, 0, 31)
-	v1_501.Size = UDim2.new(1, -16, 0, 6)
-	v1_501.BackgroundColor3 = v0_8.Off
-	v1_501.BorderSizePixel = 0
-	v1_501.Parent = v1_498
-	local v1_502 = Instance.new("Frame")
-	v1_502.Name = "Fill"
-	v1_502.Size = UDim2.new(v1_489(v1_494), 0, 1, 0)
-	v1_502.BackgroundColor3 = v0_8.Accent
-	v1_502.BorderSizePixel = 0
-	v1_502.Parent = v1_501
-	local v1_503 = v0_8.Accent
-	local v1_504 = v0_8.Accent:Lerp(v0_8.Text, 0.25)
-	local v1_505 = Instance.new("TextButton")
-	v1_505.Name = "Hit"
-	v1_505.Size = UDim2.new(1, 0, 1, 0)
-	v1_505.BackgroundTransparency = 1
-	v1_505.BorderSizePixel = 0
-	v1_505.Text = ""
-	v1_505.AutoButtonColor = false
-	v1_505.Parent = v1_498
-	local function v1_506()
-		local v2_507 = v1_495 or v1_496
-		v0_12(v1_498, { BackgroundColor3 = v2_507 and v0_8.Hover or v0_8.Element }, 0.12)
-		v0_12(v1_502, { BackgroundColor3 = v2_507 and v1_504 or v1_503 }, 0.12)
+	local v1_535 = v1_527(tonumber(v1_518.Default) or v1_522)
+	local v1_536, v1_537 = false, false
+	local v1_538 = nil
+	local v1_539 = Instance.new("Frame")
+	v1_539.Name = "Slider"
+	v1_539.Size = UDim2.new(1, 0, 0, 46)
+	v1_539.BackgroundColor3 = v0_8.Element
+	v1_539.BorderSizePixel = 0
+	v1_539.LayoutOrder = self._count
+	v1_539.Parent = self.Holder
+	v0_63(v1_539, 6)
+	local v1_540 = Instance.new("TextLabel")
+	v1_540.Name = "Name"
+	v1_540.Position = UDim2.new(0, 8, 0, 6)
+	v1_540.Size = UDim2.new(0.6, -8, 0, 16)
+	v1_540.BackgroundTransparency = 1
+	v1_540.BorderSizePixel = 0
+	v1_519:_track(v1_540, "Text", v1_518.Name or "Slider")
+	v1_540.TextColor3 = v0_8.Text
+	v1_540.Font = Enum.Font.Gotham
+	v1_540.TextSize = 14
+	v1_540.TextXAlignment = Enum.TextXAlignment.Left
+	v1_540.TextTruncate = Enum.TextTruncate.AtEnd
+	v1_540.Parent = v1_539
+	local v1_541 = Instance.new("TextLabel")
+	v1_541.Name = "Value"
+	v1_541.Position = UDim2.new(0.6, 0, 0, 6)
+	v1_541.Size = UDim2.new(0.4, -8, 0, 16)
+	v1_541.BackgroundTransparency = 1
+	v1_541.BorderSizePixel = 0
+	v1_541.Text = v1_532(v1_535)
+	v1_541.TextColor3 = v0_8.SubText
+	v1_541.Font = Enum.Font.GothamBold
+	v1_541.TextSize = 13
+	v1_541.TextXAlignment = Enum.TextXAlignment.Right
+	v1_541.TextTruncate = Enum.TextTruncate.AtEnd
+	v1_541.Parent = v1_539
+	v1_519:_onLang(v1_541, function() v1_541.Text = v1_532(v1_535) end)
+	local v1_542 = Instance.new("Frame")
+	v1_542.Name = "Track"
+	v1_542.Position = UDim2.new(0, 8, 0, 31)
+	v1_542.Size = UDim2.new(1, -16, 0, 6)
+	v1_542.BackgroundColor3 = v0_8.Off
+	v1_542.BorderSizePixel = 0
+	v1_542.Parent = v1_539
+	local v1_543 = Instance.new("Frame")
+	v1_543.Name = "Fill"
+	v1_543.Size = UDim2.new(v1_530(v1_535), 0, 1, 0)
+	v1_543.BackgroundColor3 = v0_8.Accent
+	v1_543.BorderSizePixel = 0
+	v1_543.Parent = v1_542
+	local v1_544 = v0_8.Accent
+	local v1_545 = v0_8.Accent:Lerp(v0_8.Text, 0.25)
+	local v1_546 = Instance.new("TextButton")
+	v1_546.Name = "Hit"
+	v1_546.Size = UDim2.new(1, 0, 1, 0)
+	v1_546.BackgroundTransparency = 1
+	v1_546.BorderSizePixel = 0
+	v1_546.Text = ""
+	v1_546.AutoButtonColor = false
+	v1_546.Parent = v1_539
+	local function v1_547()
+		local v2_548 = v1_536 or v1_537
+		v0_12(v1_539, { BackgroundColor3 = v2_548 and v0_8.Hover or v0_8.Element }, 0.12)
+		v0_12(v1_543, { BackgroundColor3 = v2_548 and v1_545 or v1_544 }, 0.12)
 	end
-	local function v1_508(v2_509)
-		local v2_510 = v1_489(v1_494)
-		v0_12(v1_502, { Size = UDim2.new(v2_510, 0, 1, 0) }, v2_509)
-		v1_500.Text = v1_491(v1_494)
+	local function v1_549(v2_550)
+		local v2_551 = v1_530(v1_535)
+		v0_12(v1_543, { Size = UDim2.new(v2_551, 0, 1, 0) }, v2_550)
+		v1_541.Text = v1_532(v1_535)
 	end
-	local function v1_511(v2_512, v2_513, v2_514)
-		v2_512 = v1_486(v2_512)
-		local v2_515 = v2_512 ~= v1_494
-		v1_494 = v2_512
-		v1_508(v2_514)
-		if v2_515 then
-			v1_500.TextColor3 = v0_8.Text
-			v0_12(v1_500, { TextColor3 = v0_8.SubText }, 0.3)
-			if not v2_513 and v1_477.Callback then v1_477.Callback(v1_494) end
+	local function v1_552(v2_553, v2_554, v2_555)
+		v2_553 = v1_527(v2_553)
+		local v2_556 = v2_553 ~= v1_535
+		v1_535 = v2_553
+		v1_549(v2_555)
+		if v2_556 then
+			v1_541.TextColor3 = v0_8.Text
+			v0_12(v1_541, { TextColor3 = v0_8.SubText }, 0.3)
+			if not v2_554 and v1_518.Callback then v1_518.Callback(v1_535) end
 		end
 	end
-	local function v1_516(v2_517)
-		local v2_518 = v1_501.AbsoluteSize.X
-		if v2_518 <= 0 then return end
-		v1_511(v1_481 + ((v2_517 - v1_501.AbsolutePosition.X) / v2_518) * (v1_482 - v1_481), false, 0.08)
+	local function v1_557(v2_558)
+		local v2_559 = v1_542.AbsoluteSize.X
+		if v2_559 <= 0 then return end
+		v1_552(v1_522 + ((v2_558 - v1_542.AbsolutePosition.X) / v2_559) * (v1_523 - v1_522), false, 0.08)
 	end
-	local function v1_519()
-		if v1_497 then
-			for v4_520, v4_521 in ipairs(v1_497) do v4_521:Disconnect() end
-			v1_497 = nil
+	local function v1_560()
+		if v1_538 then
+			for v4_561, v4_562 in ipairs(v1_538) do v4_562:Disconnect() end
+			v1_538 = nil
 		end
-		if v1_496 then
-			v1_496 = false
-			v1_506()
+		if v1_537 then
+			v1_537 = false
+			v1_547()
 		end
 	end
-	local function v1_522(v2_523)
-		v1_519()
-		v1_496 = true
-		v1_506()
-		v1_516(v2_523.Position.X)
-		v1_497 = {
-			v0_4.InputChanged:Connect(function(v3_524)
-				if v3_524.UserInputType == Enum.UserInputType.MouseMovement or v3_524 == v2_523 then
-					v1_516(v3_524.Position.X)
+	local function v1_563(v2_564)
+		v1_560()
+		v1_537 = true
+		v1_547()
+		v1_557(v2_564.Position.X)
+		v1_538 = {
+			v0_4.InputChanged:Connect(function(v3_565)
+				if v3_565.UserInputType == Enum.UserInputType.MouseMovement or v3_565 == v2_564 then
+					v1_557(v3_565.Position.X)
 				end
 			end),
-			v0_4.InputEnded:Connect(function(v3_525)
-				if v3_525 == v2_523 or v3_525.UserInputType == Enum.UserInputType.MouseButton1 then
-					v1_519()
+			v0_4.InputEnded:Connect(function(v3_566)
+				if v3_566 == v2_564 or v3_566.UserInputType == Enum.UserInputType.MouseButton1 then
+					v1_560()
 				end
 			end),
 		}
 	end
-	v1_505.InputBegan:Connect(function(v2_526)
-		if v0_19(v2_526) then v1_522(v2_526) end
+	v1_546.InputBegan:Connect(function(v2_567)
+		if v0_19(v2_567) then v1_563(v2_567) end
 	end)
-	v1_505.MouseEnter:Connect(function()
-		v1_495 = true
-		v1_506()
+	v1_546.MouseEnter:Connect(function()
+		v1_536 = true
+		v1_547()
 	end)
-	v1_505.MouseLeave:Connect(function()
-		v1_495 = false
-		v1_506()
+	v1_546.MouseLeave:Connect(function()
+		v1_536 = false
+		v1_547()
 	end)
-	local v1_527 = { Instance = v1_498 }
-	function v1_527:Set(v2_528, v2_529)
-		v1_511(tonumber(v2_528) or v1_494, v2_529, 0.2)
+	local v1_568 = { Instance = v1_539 }
+	function v1_568:Set(v2_569, v2_570)
+		v1_552(tonumber(v2_569) or v1_535, v2_570, 0.2)
 	end
-	function v1_527:Get()
-		return v1_494
+	function v1_568:Get()
+		return v1_535
 	end
-	function v1_527:Destroy()
-		v1_519()
-		v1_478._cleanups[v1_527] = nil
-		v1_498:Destroy()
+	function v1_568:Destroy()
+		v1_560()
+		v1_519._cleanups[v1_568] = nil
+		v1_539:Destroy()
 	end
-	v1_478._cleanups[v1_527] = v1_519
-	return v1_527
+	v1_519._cleanups[v1_568] = v1_560
+	return v1_568
 end
-function v0_3:AddDropdown(v1_530)
-	v1_530 = v1_530 or {}
+function v0_3:AddDropdown(v1_571)
+	v1_571 = v1_571 or {}
 	self._count += 1
-	local v1_531 = v1_530.Options or {}
-	local v1_532 = v1_530.Multi == true
-	local v1_533 = 130
-	local v1_534, v1_535 = 26, 4
-	local v1_536 = nil
-	local v1_537 = {}
-	local v1_538 = {}
-	local v1_539 = false
-	local v1_540 = 0
-	local v1_541 = nil
-	local v1_542 = Instance.new("Frame")
-	v1_542.Name = "Dropdown"
-	v1_542.Size = UDim2.new(1, 0, 0, 32)
-	v1_542.AutomaticSize = Enum.AutomaticSize.Y
-	v1_542.BackgroundTransparency = 1
-	v1_542.BorderSizePixel = 0
-	v1_542.LayoutOrder = self._count
-	v1_542.Parent = self.Holder
-	local v1_543 = Instance.new("UIListLayout")
-	v1_543.Padding = UDim.new(0, 4)
-	v1_543.SortOrder = Enum.SortOrder.LayoutOrder
-	v1_543.Parent = v1_542
-	local v1_544 = Instance.new("TextButton")
-	v1_544.Name = "Header"
-	v1_544.Size = UDim2.new(1, 0, 0, 32)
-	v1_544.BackgroundColor3 = v0_8.Element
-	v1_544.BorderSizePixel = 0
-	v1_544.Text = ""
-	v1_544.AutoButtonColor = false
-	v1_544.LayoutOrder = 1
-	v1_544.Parent = v1_542
-	v0_63(v1_544, 6)
-	v0_21(v1_544, v0_8.Element, v0_8.Hover)
-	local v1_545 = Instance.new("TextLabel")
-	v1_545.Name = "Name"
-	v1_545.Position = UDim2.new(0, 8, 0, 0)
-	v1_545.Size = UDim2.new(0.5, -8, 1, 0)
-	v1_545.BackgroundTransparency = 1
-	v1_545.BorderSizePixel = 0
-	v1_545.Text = v1_530.Name or "Dropdown"
-	v1_545.TextColor3 = v0_8.Text
-	v1_545.Font = Enum.Font.Gotham
-	v1_545.TextSize = 14
-	v1_545.TextXAlignment = Enum.TextXAlignment.Left
-	v1_545.TextTruncate = Enum.TextTruncate.AtEnd
-	v1_545.Parent = v1_544
-	local v1_546 = Instance.new("TextLabel")
-	v1_546.Name = "Value"
-	v1_546.Position = UDim2.new(0.5, 0, 0, 0)
-	v1_546.Size = UDim2.new(0.5, -28, 1, 0)
-	v1_546.BackgroundTransparency = 1
-	v1_546.BorderSizePixel = 0
-	v1_546.Text = "None"
-	v1_546.TextColor3 = v0_8.SubText
-	v1_546.Font = Enum.Font.Gotham
-	v1_546.TextSize = 13
-	v1_546.TextXAlignment = Enum.TextXAlignment.Right
-	v1_546.TextTruncate = Enum.TextTruncate.AtEnd
-	v1_546.Parent = v1_544
-	local v1_547 = Instance.new("ImageLabel")
-	v1_547.Name = "Arrow"
-	v1_547.AnchorPoint = Vector2.new(1, 0.5)
-	v1_547.Position = UDim2.new(1, -8, 0.5, 0)
-	v1_547.Size = UDim2.new(0, 16, 0, 16)
-	v1_547.BackgroundTransparency = 1
-	v1_547.BorderSizePixel = 0
-	v1_547.ImageColor3 = v0_8.SubText
-	v1_547.ScaleType = Enum.ScaleType.Fit
-	v1_547.Parent = v1_544
-	local v1_548 = Instance.new("TextLabel")
-	v1_548.Name = "ArrowFallback"
-	v1_548.Size = UDim2.new(1, 0, 1, 0)
-	v1_548.BackgroundTransparency = 1
-	v1_548.Text = "▼"
-	v1_548.TextColor3 = v0_8.SubText
-	v1_548.Font = Enum.Font.Gotham
-	v1_548.TextSize = 9
-	v1_548.Visible = false
-	v1_548.Parent = v1_547
-	local function v1_549(v2_550)
-		local v2_551 = v0_44(v1_547, v2_550 and "chevron-up" or "chevron-down", self._icons)
-		if not v2_551 then v1_547.Image = "" end
-		v1_548.Visible = not v2_551
-		v1_548.Text = v2_550 and "▲" or "▼"
-		v1_547.ImageTransparency = 1
-		v1_548.TextTransparency = 1
-		v0_12(v1_547, { ImageTransparency = 0 }, 0.18)
-		v0_12(v1_548, { TextTransparency = 0 }, 0.18)
+	local v1_572 = v1_571.Options or {}
+	local v1_573 = v1_571.Multi == true
+	local v1_574 = 130
+	local v1_575, v1_576 = 26, 4
+	local v1_577 = nil
+	local v1_578 = {}
+	local v1_579 = {}
+	local v1_580 = false
+	local v1_581 = 0
+	local v1_582 = nil
+	local v1_583 = Instance.new("Frame")
+	v1_583.Name = "Dropdown"
+	v1_583.Size = UDim2.new(1, 0, 0, 32)
+	v1_583.AutomaticSize = Enum.AutomaticSize.Y
+	v1_583.BackgroundTransparency = 1
+	v1_583.BorderSizePixel = 0
+	v1_583.LayoutOrder = self._count
+	v1_583.Parent = self.Holder
+	local v1_584 = Instance.new("UIListLayout")
+	v1_584.Padding = UDim.new(0, 4)
+	v1_584.SortOrder = Enum.SortOrder.LayoutOrder
+	v1_584.Parent = v1_583
+	local v1_585 = Instance.new("TextButton")
+	v1_585.Name = "Header"
+	v1_585.Size = UDim2.new(1, 0, 0, 32)
+	v1_585.BackgroundColor3 = v0_8.Element
+	v1_585.BorderSizePixel = 0
+	v1_585.Text = ""
+	v1_585.AutoButtonColor = false
+	v1_585.LayoutOrder = 1
+	v1_585.Parent = v1_583
+	v0_63(v1_585, 6)
+	v0_21(v1_585, v0_8.Element, v0_8.Hover)
+	local v1_586 = Instance.new("TextLabel")
+	v1_586.Name = "Name"
+	v1_586.Position = UDim2.new(0, 8, 0, 0)
+	v1_586.Size = UDim2.new(0.5, -8, 1, 0)
+	v1_586.BackgroundTransparency = 1
+	v1_586.BorderSizePixel = 0
+	self._lib:_track(v1_586, "Text", v1_571.Name or "Dropdown")
+	v1_586.TextColor3 = v0_8.Text
+	v1_586.Font = Enum.Font.Gotham
+	v1_586.TextSize = 14
+	v1_586.TextXAlignment = Enum.TextXAlignment.Left
+	v1_586.TextTruncate = Enum.TextTruncate.AtEnd
+	v1_586.Parent = v1_585
+	local v1_587 = Instance.new("TextLabel")
+	v1_587.Name = "Value"
+	v1_587.Position = UDim2.new(0.5, 0, 0, 0)
+	v1_587.Size = UDim2.new(0.5, -28, 1, 0)
+	v1_587.BackgroundTransparency = 1
+	v1_587.BorderSizePixel = 0
+	v1_587.Text = v0_82("None")
+	v1_587.TextColor3 = v0_8.SubText
+	v1_587.Font = Enum.Font.Gotham
+	v1_587.TextSize = 13
+	v1_587.TextXAlignment = Enum.TextXAlignment.Right
+	v1_587.TextTruncate = Enum.TextTruncate.AtEnd
+	v1_587.Parent = v1_585
+	local v1_588 = Instance.new("ImageLabel")
+	v1_588.Name = "Arrow"
+	v1_588.AnchorPoint = Vector2.new(1, 0.5)
+	v1_588.Position = UDim2.new(1, -8, 0.5, 0)
+	v1_588.Size = UDim2.new(0, 16, 0, 16)
+	v1_588.BackgroundTransparency = 1
+	v1_588.BorderSizePixel = 0
+	v1_588.ImageColor3 = v0_8.SubText
+	v1_588.ScaleType = Enum.ScaleType.Fit
+	v1_588.Parent = v1_585
+	local v1_589 = Instance.new("TextLabel")
+	v1_589.Name = "ArrowFallback"
+	v1_589.Size = UDim2.new(1, 0, 1, 0)
+	v1_589.BackgroundTransparency = 1
+	v1_589.Text = "▼"
+	v1_589.TextColor3 = v0_8.SubText
+	v1_589.Font = Enum.Font.Gotham
+	v1_589.TextSize = 9
+	v1_589.Visible = false
+	v1_589.Parent = v1_588
+	local function v1_590(v2_591)
+		local v2_592 = v0_44(v1_588, v2_591 and "chevron-up" or "chevron-down", self._icons)
+		if not v2_592 then v1_588.Image = "" end
+		v1_589.Visible = not v2_592
+		v1_589.Text = v2_591 and "▲" or "▼"
+		v1_588.ImageTransparency = 1
+		v1_589.TextTransparency = 1
+		v0_12(v1_588, { ImageTransparency = 0 }, 0.18)
+		v0_12(v1_589, { TextTransparency = 0 }, 0.18)
 	end
-	v1_549(false)
-	local v1_552 = Instance.new("ScrollingFrame")
-	v1_552.Name = "List"
-	v1_552.Size = UDim2.new(1, 0, 0, 0)
-	v1_552.BackgroundColor3 = v0_8.Sidebar
-	v1_552.BorderSizePixel = 0
-	v1_552.ScrollBarThickness = 3
-	v1_552.ScrollBarImageColor3 = v0_8.IconOff
-	v1_552.ScrollingDirection = Enum.ScrollingDirection.Y
-	v1_552.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	v1_552.CanvasSize = UDim2.new(0, 0, 0, 0)
-	v1_552.Visible = false
-	v1_552.LayoutOrder = 2
-	v1_552.Parent = v1_542
-	v0_63(v1_552, 6)
-	local v1_553 = Instance.new("UIPadding")
-	v1_553.PaddingTop = UDim.new(0, 4)
-	v1_553.PaddingBottom = UDim.new(0, 4)
-	v1_553.Parent = v1_552
-	local v1_554 = Instance.new("UIListLayout")
-	v1_554.Padding = UDim.new(0, v1_535)
-	v1_554.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	v1_554.SortOrder = Enum.SortOrder.LayoutOrder
-	v1_554.Parent = v1_552
-	local function v1_555(v2_556)
-		if v1_532 then return v1_537[v2_556] == true end
-		return v1_536 == v2_556
+	v1_590(false)
+	local v1_593 = Instance.new("ScrollingFrame")
+	v1_593.Name = "List"
+	v1_593.Size = UDim2.new(1, 0, 0, 0)
+	v1_593.BackgroundColor3 = v0_8.Sidebar
+	v1_593.BorderSizePixel = 0
+	v1_593.ScrollBarThickness = 3
+	v1_593.ScrollBarImageColor3 = v0_8.IconOff
+	v1_593.ScrollingDirection = Enum.ScrollingDirection.Y
+	v1_593.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	v1_593.CanvasSize = UDim2.new(0, 0, 0, 0)
+	v1_593.Visible = false
+	v1_593.LayoutOrder = 2
+	v1_593.Parent = v1_583
+	v0_63(v1_593, 6)
+	local v1_594 = Instance.new("UIPadding")
+	v1_594.PaddingTop = UDim.new(0, 4)
+	v1_594.PaddingBottom = UDim.new(0, 4)
+	v1_594.Parent = v1_593
+	local v1_595 = Instance.new("UIListLayout")
+	v1_595.Padding = UDim.new(0, v1_576)
+	v1_595.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	v1_595.SortOrder = Enum.SortOrder.LayoutOrder
+	v1_595.Parent = v1_593
+	local function v1_596(v2_597)
+		if v1_573 then return v1_578[v2_597] == true end
+		return v1_577 == v2_597
 	end
-	local function v1_557()
-		local v2_558 = {}
-		for v3_559, v3_560 in ipairs(v1_531) do
-			if v1_537[v3_560] then table.insert(v2_558, v3_560) end
+	local function v1_598()
+		local v2_599 = {}
+		for v3_600, v3_601 in ipairs(v1_572) do
+			if v1_578[v3_601] then table.insert(v2_599, v3_601) end
 		end
-		return v2_558
+		return v2_599
 	end
-	local function v1_561()
-		for v3_562, v3_563 in pairs(v1_538) do
-			local v3_564 = v1_555(v3_562)
-			v3_563.BackgroundColor3 = v3_564 and v0_8.Accent or v0_8.Element
-			v3_563.TextColor3 = v3_564 and v0_8.IconOn or v0_8.SubText
+	local function v1_602()
+		for v3_603, v3_604 in pairs(v1_579) do
+			local v3_605 = v1_596(v3_603)
+			v3_604.BackgroundColor3 = v3_605 and v0_8.Accent or v0_8.Element
+			v3_604.TextColor3 = v3_605 and v0_8.IconOn or v0_8.SubText
 		end
-		if v1_532 then
-			local v3_565 = {}
-			for v4_566, v4_567 in ipairs(v1_557()) do table.insert(v3_565, tostring(v4_567)) end
-			v1_546.Text = #v3_565 > 0 and table.concat(v3_565, ", ") or "None"
+		if v1_573 then
+			local v3_606 = {}
+			for v4_607, v4_608 in ipairs(v1_598()) do table.insert(v3_606, v0_82(tostring(v4_608))) end
+			v1_587.Text = #v3_606 > 0 and table.concat(v3_606, ", ") or v0_82("None")
 		else
-			v1_546.Text = v1_536 ~= nil and tostring(v1_536) or "None"
+			v1_587.Text = v1_577 ~= nil and v0_82(tostring(v1_577)) or v0_82("None")
 		end
 	end
-	local function v1_568(v2_569)
-		if v1_539 == v2_569 then return end
-		v1_539 = v2_569
-		if v1_541 then v1_541:Cancel() end
-		v1_549(v2_569)
-		if v2_569 then
-			v1_552.Visible = true
-			v1_541 = v0_12(v1_552, { Size = UDim2.new(1, 0, 0, v1_540) }, 0.22, Enum.EasingStyle.Quint)
+	self._lib:_onLang(v1_587, v1_602)
+	local function v1_609(v2_610)
+		if v1_580 == v2_610 then return end
+		v1_580 = v2_610
+		if v1_582 then v1_582:Cancel() end
+		v1_590(v2_610)
+		if v2_610 then
+			v1_593.Visible = true
+			v1_582 = v0_12(v1_593, { Size = UDim2.new(1, 0, 0, v1_581) }, 0.22, Enum.EasingStyle.Quint)
 		else
-			local v3_570 = v0_12(v1_552, { Size = UDim2.new(1, 0, 0, 0) }, 0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-			v1_541 = v3_570
-			v3_570.Completed:Connect(function(v4_571)
-				if v4_571 == Enum.PlaybackState.Completed and not v1_539 then
-					v1_552.Visible = false
+			local v3_611 = v0_12(v1_593, { Size = UDim2.new(1, 0, 0, 0) }, 0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			v1_582 = v3_611
+			v3_611.Completed:Connect(function(v4_612)
+				if v4_612 == Enum.PlaybackState.Completed and not v1_580 then
+					v1_593.Visible = false
 				end
 			end)
 		end
 	end
-	local v1_572 = { Instance = v1_542 }
-	local function v1_573()
-		if v1_530.Callback then
-			v1_530.Callback(v1_532 and v1_557() or v1_536)
+	local v1_613 = { Instance = v1_583 }
+	local function v1_614()
+		if v1_571.Callback then
+			v1_571.Callback(v1_573 and v1_598() or v1_577)
 		end
 	end
-	local function v1_574()
-		for v3_575, v3_576 in pairs(v1_538) do v3_576:Destroy() end
-		v1_538 = {}
-		for v3_577, v3_578 in ipairs(v1_531) do
-			local v3_579 = Instance.new("TextButton")
-			v3_579.Name = "Option"
-			v3_579.Size = UDim2.new(1, -8, 0, v1_534)
-			v3_579.BackgroundColor3 = v0_8.Element
-			v3_579.BorderSizePixel = 0
-			v3_579.Text = tostring(v3_578)
-			v3_579.TextColor3 = v0_8.SubText
-			v3_579.Font = Enum.Font.Gotham
-			v3_579.TextSize = 13
-			v3_579.TextTruncate = Enum.TextTruncate.AtEnd
-			v3_579.AutoButtonColor = true
-			v3_579.LayoutOrder = v3_577
-			v3_579.Parent = v1_552
-			v0_63(v3_579, 5)
-			v3_579.MouseButton1Click:Connect(function()
-				if v1_532 then
-					v1_537[v3_578] = not v1_537[v3_578] or nil
-					v1_561()
-					v1_573()
+	local function v1_615()
+		for v3_616, v3_617 in pairs(v1_579) do v3_617:Destroy() end
+		v1_579 = {}
+		for v3_618, v3_619 in ipairs(v1_572) do
+			local v3_620 = Instance.new("TextButton")
+			v3_620.Name = "Option"
+			v3_620.Size = UDim2.new(1, -8, 0, v1_575)
+			v3_620.BackgroundColor3 = v0_8.Element
+			v3_620.BorderSizePixel = 0
+			self._lib:_track(v3_620, "Text", tostring(v3_619))
+			v3_620.TextColor3 = v0_8.SubText
+			v3_620.Font = Enum.Font.Gotham
+			v3_620.TextSize = 13
+			v3_620.TextTruncate = Enum.TextTruncate.AtEnd
+			v3_620.AutoButtonColor = true
+			v3_620.LayoutOrder = v3_618
+			v3_620.Parent = v1_593
+			v0_63(v3_620, 5)
+			v3_620.MouseButton1Click:Connect(function()
+				if v1_573 then
+					v1_578[v3_619] = not v1_578[v3_619] or nil
+					v1_602()
+					v1_614()
 				else
-					v1_536 = v3_578
-					v1_561()
-					v1_568(false)
-					v1_573()
+					v1_577 = v3_619
+					v1_602()
+					v1_609(false)
+					v1_614()
 				end
 			end)
-			v1_538[v3_578] = v3_579
+			v1_579[v3_619] = v3_620
 		end
-		local v2_580 = #v1_531
-		local v2_581 = v2_580 > 0 and (v2_580 * v1_534 + (v2_580 - 1) * v1_535 + 8) or 0
-		v1_540 = math.min(v2_581, v1_533)
-		v1_552.Size = UDim2.new(1, 0, 0, v1_539 and v1_540 or 0)
-		v1_561()
+		local v2_621 = #v1_572
+		local v2_622 = v2_621 > 0 and (v2_621 * v1_575 + (v2_621 - 1) * v1_576 + 8) or 0
+		v1_581 = math.min(v2_622, v1_574)
+		v1_593.Size = UDim2.new(1, 0, 0, v1_580 and v1_581 or 0)
+		v1_602()
 	end
-	function v1_572:Set(v2_582, v2_583)
-		if v1_532 then
-			v1_537 = {}
-			for v4_584, v4_585 in ipairs(typeof(v2_582) == "table" and v2_582 or { v2_582 }) do
-				v1_537[v4_585] = true
+	function v1_613:Set(v2_623, v2_624)
+		if v1_573 then
+			v1_578 = {}
+			for v4_625, v4_626 in ipairs(typeof(v2_623) == "table" and v2_623 or { v2_623 }) do
+				v1_578[v4_626] = true
 			end
 		else
-			v1_536 = v2_582
+			v1_577 = v2_623
 		end
-		v1_561()
-		if not v2_583 then v1_573() end
+		v1_602()
+		if not v2_624 then v1_614() end
 	end
-	function v1_572:Get()
-		return v1_532 and v1_557() or v1_536
+	function v1_613:Get()
+		return v1_573 and v1_598() or v1_577
 	end
-	function v1_572:Refresh(v2_586, v2_587)
-		v1_531 = v2_586 or {}
-		if v2_587 then
-			local v3_588 = {}
-			for v4_589, v4_590 in ipairs(v1_531) do v3_588[v4_590] = true end
-			if v1_532 then
-				for v5_591 in pairs(v1_537) do
-					if not v3_588[v5_591] then v1_537[v5_591] = nil end
+	function v1_613:Refresh(v2_627, v2_628)
+		v1_572 = v2_627 or {}
+		if v2_628 then
+			local v3_629 = {}
+			for v4_630, v4_631 in ipairs(v1_572) do v3_629[v4_631] = true end
+			if v1_573 then
+				for v5_632 in pairs(v1_578) do
+					if not v3_629[v5_632] then v1_578[v5_632] = nil end
 				end
-			elseif not v3_588[v1_536] then
-				v1_536 = nil
+			elseif not v3_629[v1_577] then
+				v1_577 = nil
 			end
 		else
-			v1_537, v1_536 = {}, nil
+			v1_578, v1_577 = {}, nil
 		end
-		v1_574()
+		v1_615()
 	end
-	function v1_572:Open() v1_568(true) end
-	function v1_572:Close() v1_568(false) end
-	v1_544.MouseButton1Click:Connect(function()
-		v1_568(not v1_539)
+	function v1_613:Open() v1_609(true) end
+	function v1_613:Close() v1_609(false) end
+	v1_585.MouseButton1Click:Connect(function()
+		v1_609(not v1_580)
 	end)
-	v1_574()
-	if v1_530.Default ~= nil then
-		v1_572:Set(v1_530.Default, true)
+	v1_615()
+	if v1_571.Default ~= nil then
+		v1_613:Set(v1_571.Default, true)
 	end
-	return v1_572
+	return v1_613
 end
 return v0_1
